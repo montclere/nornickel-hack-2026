@@ -1,0 +1,72 @@
+[
+  {
+    "id": "t_2009_ph_ni",
+    "chunk_id": "report_2009::0",
+    "doc_id": "report_2009",
+    "subject": "pH",
+    "relation": "повышает",
+    "object": "Ni_recovery",
+    "sign": "+",
+    "conditions": {"ore": "pentlandite"},
+    "outcome": "success",
+    "closure_reason": null,
+    "evidence_quote": "Повышение pH пульпы увеличивает извлечение Ni на рудах пентландита.",
+    "year": 2009
+  },
+  {
+    "id": "t_2015_cmc_ph",
+    "chunk_id": "openalex_2015::0",
+    "doc_id": "openalex_2015",
+    "subject": "CMC",
+    "relation": "сдвигает",
+    "object": "pH",
+    "sign": "+",
+    "conditions": {},
+    "outcome": "neutral",
+    "closure_reason": null,
+    "evidence_quote": "CMC addition shifts pulp pH upward, affecting selectivity in Cu-Ni flotation.",
+    "year": 2015
+  },
+  {
+    "id": "t_2019_ph_ni",
+    "chunk_id": "openalex_2019::0",
+    "doc_id": "openalex_2019",
+    "subject": "pH",
+    "relation": "снижает",
+    "object": "Ni_recovery",
+    "sign": "-",
+    "conditions": {"ore": "pyrrhotite"},
+    "outcome": "failure",
+    "closure_reason": null,
+    "evidence_quote": "At high pH nickel recovery decreases for pyrrhotite-rich ore.",
+    "year": 2019
+  },
+  {
+    "id": "t_2011_colx_ni",
+    "chunk_id": "report_2011::0",
+    "doc_id": "report_2011",
+    "subject": "collector_X",
+    "relation": "повышает",
+    "object": "Ni_recovery",
+    "sign": "+",
+    "conditions": {},
+    "outcome": "success",
+    "closure_reason": null,
+    "evidence_quote": "Коллектор X повышает извлечение никеля на 1.5%.",
+    "year": 2011
+  },
+  {
+    "id": "t_2012_colx_fail",
+    "chunk_id": "report_2012::0",
+    "doc_id": "report_2012",
+    "subject": "collector_X",
+    "relation": "отклонён",
+    "object": "Ni_recovery",
+    "sign": "0",
+    "conditions": {},
+    "outcome": "failure",
+    "closure_reason": "дорого",
+    "evidence_quote": "Коллектор X отклонён: синтез слишком дорогой для промышленного масштаба.",
+    "year": 2012
+  }
+]

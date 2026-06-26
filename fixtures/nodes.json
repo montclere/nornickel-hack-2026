@@ -1,0 +1,45 @@
+[
+  {
+    "id": "Ni_recovery",
+    "label": "Извлечение Ni",
+    "type": "KPI",
+    "aliases": ["nickel recovery", "извлечение никеля"]
+  },
+  {
+    "id": "pH",
+    "label": "pH пульпы",
+    "type": "parameter",
+    "aliases": ["кислотность", "pulp pH"]
+  },
+  {
+    "id": "CMC",
+    "label": "Карбоксиметилцеллюлоза",
+    "type": "reagent",
+    "aliases": ["carboxymethyl cellulose", "КМЦ"]
+  },
+  {
+    "id": "collector_X",
+    "label": "Коллектор X",
+    "type": "reagent",
+    "aliases": ["collector X"]
+  },
+  {
+    "id": "pentlandite",
+    "label": "Пентландит",
+    "type": "material",
+    "aliases": ["pentlandite"]
+  },
+  {
+    "id": "стоимость_синтеза",
+    "label": "Стоимость синтеза",
+    "type": "parameter",
+    "aliases": ["reagent cost", "synthesis cost"]
+  },
+  {
+    "id": "failure_collector_X_2012",
+    "label": "Отказ от коллектора X (2012)",
+    "type": "failure",
+    "aliases": [],
+    "closure_reason": "дорого"
+  }
+]
