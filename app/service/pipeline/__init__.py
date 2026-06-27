@@ -5,6 +5,7 @@
 `service` (entities, interfaces, domain), но НЕ от `api`.
 """
 
+from app.service.pipeline.build_graph import BuildGraph
 from app.service.pipeline.build_knowledge_base import BuildKnowledgeBase
 from app.service.pipeline.chat import Chat
 from app.service.pipeline.enrich_graph import EnrichGraph
@@ -13,6 +14,7 @@ from app.service.pipeline.submit_feedback import SubmitFeedback
 
 __all__ = [
     "BuildKnowledgeBase",
+    "BuildGraph",
     "EnrichGraph",
     "GenerateHypotheses",
     "SubmitFeedback",

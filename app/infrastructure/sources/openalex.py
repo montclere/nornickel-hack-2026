@@ -8,6 +8,8 @@ OpenAlex отдаёт абстракт не текстом, а инвертир�
 
 from __future__ import annotations
 
+import time
+
 import httpx
 
 from app.service.entities import Document
@@ -97,9 +99,32 @@ class OpenAlexSource:
             "select": _SELECT,
             "mailto": self.mailto,
         }
-        resp = self._get_client().get(OPENALEX_WORKS, params=params)
-        resp.raise_for_status()
-        return resp.json().get("results", [])
+        last: Exception | None = None
+        for attempt in range(3):  # OpenAlex иногда отдаёт 5xx — пара повторов
+            try:
+                resp = self._get_client().get(OPENALEX_WORKS, params=params)
+                if resp.status_code in (429, 500, 502, 503, 504):
+                    raise httpx.HTTPStatusError(
+                        f"retryable {resp.status_code}", request=resp.request, response=resp
+                    )
+                resp.raise_for_status()
+                return resp.json().get("results", [])
+            except httpx.HTTPError as exc:
+                last = exc
+                if attempt < 2:
+                    time.sleep(1.5 * (attempt + 1))
+        raise last  # type: ignore[misc]
+
+    def search(self, query: str, *, limit: int = 5) -> list[Document]:
+        """Один поисковый запрос → до `limit` статей с абстрактом (для агента)."""
+        docs: list[Document] = []
+        for work in self._fetch_query(query):
+            doc = work_to_document(work)
+            if doc is not None:
+                docs.append(doc)
+            if len(docs) >= limit:
+                break
+        return docs
 
     def fetch(self, *, max_docs: int = 200) -> list[Document]:
         """Прогнать все запросы, смапить в Document, дедуплицировать по id."""

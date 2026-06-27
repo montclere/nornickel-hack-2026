@@ -63,8 +63,9 @@ def test_enrich_graph_freezes_snapshot():
     snap = c.enrich_graph.execute(KPI)
     assert isinstance(snap, GraphSnapshot)
     assert snap.triplet_count >= 1
-    # snapshot_id детерминирован
-    assert snap.snapshot_id == c.enrich_graph.execute(KPI).snapshot_id
+    # детерминизм: тот же стартовый граф + тот же агент → тот же snapshot_id
+    c2 = build("fake")
+    assert snap.snapshot_id == c2.enrich_graph.execute(KPI).snapshot_id
 
 
 def test_generate_returns_list():

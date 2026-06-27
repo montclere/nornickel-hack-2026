@@ -30,6 +30,7 @@ infra = [
     "sentence-transformers>=2.2",
     "pymupdf>=1.23",
     "langgraph>=0.2",
+    "pyvis>=0.3",
 ]
 # слой данных: OpenAlex-источник + рендер PDF-сканов для OCR
 data = [

@@ -5,21 +5,25 @@
 напр. `PHOENIX_MODE=real PHOENIX_OCR=fake` — всё real, кроме OCR.
 
 Состояние готовности адаптеров (на текущий момент проекта):
-- real реализованы: phrasing (Claude), persistence (SQLite);
-- ещё нет: ocr (1b), extractor (2), embeddings/graph (3), agent (3b) — для них real
-  откатывается на fake, поэтому build("real") остаётся оффлайн-запускаемым.
+- real реализованы: extractor (Groq), phrasing (Claude), persistence (SQLite);
+- ещё нет: ocr, embeddings/graph, agent — для них real откатывается на fake,
+  поэтому build("real") остаётся оффлайн-запускаемым.
 
-Адаптеры с онлайн-зависимостями (phrasing → Claude API) уходят в real только при наличии
-ANTHROPIC_API_KEY, иначе — fake. Реальный выбор по каждому компоненту виден в
-`Container.adapter_modes`.
+Адаптеры с онлайн-зависимостями уходят в real только при наличии своего ключа
+(extractor → GROQ_API_KEY, phrasing → ANTHROPIC_API_KEY), иначе — fake. Реальный выбор
+по каждому компоненту виден в `Container.adapter_modes`.
 """
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from importlib import util
 
 from app.config import OUTPUTS_DIR, Mode, Settings, load_settings
+from app.infrastructure.agent import LangGraphResearchAgent
+from app.infrastructure.embeddings import EntityNormalizer, SbertEmbedding
+from app.infrastructure.extraction import GroqFactExtractor
 from app.infrastructure.fakes import (
     FakeCardPhrasing,
     FakeFactExtractor,
@@ -27,6 +31,7 @@ from app.infrastructure.fakes import (
     FakeOcr,
     FakeResearchAgent,
 )
+from app.infrastructure.graph import NetworkxGraphRepository
 from app.infrastructure.persistence import (
     SQLiteCorpusRepository,
     SQLiteFeedbackRepository,
@@ -36,6 +41,7 @@ from app.infrastructure.persistence import (
 from app.infrastructure.phrasing import ClaudeCardPhrasing
 from app.service.interfaces import GraphRepository, ResearchAgent
 from app.service.pipeline import (
+    BuildGraph,
     BuildKnowledgeBase,
     Chat,
     EnrichGraph,
@@ -52,6 +58,7 @@ class Container:
     graph_repository: GraphRepository
     research_agent: ResearchAgent
     build_knowledge_base: BuildKnowledgeBase
+    build_graph_use_case: BuildGraph
     enrich_graph: EnrichGraph
     generate_hypotheses: GenerateHypotheses
     submit_feedback: SubmitFeedback
@@ -60,10 +67,6 @@ class Container:
     feedback_repository: SQLiteFeedbackRepository
     ranker_state_store: SQLiteRankerStateStore
     adapter_modes: dict[str, str] = field(default_factory=dict)
-
-
-def _key_present() -> bool:
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
 
 
 def build(mode: Mode = "fake", *, db_path: str | None = None) -> Container:
@@ -75,27 +78,54 @@ def build(mode: Mode = "fake", *, db_path: str | None = None) -> Container:
     settings = load_settings(mode=mode)
     modes: dict[str, str] = {}
 
-    def pick(component, fake_factory, real_factory=None, *, online=False):
-        """Выбрать адаптер по режиму компонента; вернуть инстанс и записать выбор."""
+    def pick(component, fake_factory, real_factory=None, *, key_env=None):
+        """Выбрать адаптер по режиму компонента; вернуть инстанс и записать выбор.
+
+        `key_env` — имя переменной с ключом онлайн-провайдера: если режим real, но
+        ключа нет, мягко откатываемся на fake (демо не падает без ключей).
+        """
         component_mode = settings.mode_for(component)
         if component_mode == "fake":
             modes[component] = "fake"
         elif real_factory is None:
             modes[component] = "fake (real ещё не готов)"
-        elif online and not _key_present():
-            modes[component] = "fake (нет ANTHROPIC_API_KEY)"
+        elif key_env and not os.getenv(key_env):
+            modes[component] = f"fake (нет {key_env})"
         else:
             modes[component] = "real"
         return real_factory() if modes[component] == "real" else fake_factory()
 
     ocr = pick("ocr", FakeOcr)  # real: Unlimited-OCR
-    fact_extractor = pick("extractor", FakeFactExtractor)  # real: Claude
-    graph_repository = pick("graph", FakeGraphRepository)  # real: NetworkX
-    research_agent = pick("agent", FakeResearchAgent)  # real: LangGraph
+    fact_extractor = pick(
+        "extractor", FakeFactExtractor,
+        lambda: GroqFactExtractor(settings=settings), key_env="GROQ_API_KEY",
+    )
+    graph_repository = pick("graph", FakeGraphRepository, NetworkxGraphRepository)
+    research_agent = pick(
+        "agent", FakeResearchAgent,
+        lambda: LangGraphResearchAgent(
+            graph_repository=graph_repository, extractor=fact_extractor, settings=settings
+        ),
+        key_env="GROQ_API_KEY",
+    )
     card_phrasing = pick(
         "phrasing", FakeCardPhrasing, lambda: ClaudeCardPhrasing(settings=settings),
-        online=True,
+        key_env="ANTHROPIC_API_KEY",
     )
+
+    # нормализация синонимов: real → sbert-косинус поверх словаря, fake → только словарь.
+    # Если sentence-transformers не установлен — мягкий откат на словарь (без косинуса).
+    if settings.mode_for("embeddings") != "fake" and util.find_spec("sentence_transformers"):
+        embedder = SbertEmbedding(settings=settings)
+        modes["embeddings"] = "real (sbert)"
+    else:
+        embedder = None
+        modes["embeddings"] = (
+            "fake (словарь без косинуса)"
+            if settings.mode_for("embeddings") == "fake"
+            else "fake (sentence-transformers не установлен)"
+        )
+    normalizer = EntityNormalizer(embedder=embedder, settings=settings)
 
     # персист — всегда SQLite (оффлайн, stdlib). fake → :memory:, real → файл.
     if db_path is None:
@@ -111,7 +141,8 @@ def build(mode: Mode = "fake", *, db_path: str | None = None) -> Container:
         graph_repository=graph_repository,
         research_agent=research_agent,
         build_knowledge_base=BuildKnowledgeBase(ocr, fact_extractor),
-        enrich_graph=EnrichGraph(research_agent, graph_repository),
+        build_graph_use_case=BuildGraph(normalizer, graph_repository),
+        enrich_graph=EnrichGraph(research_agent, graph_repository, normalizer),
         generate_hypotheses=GenerateHypotheses(graph_repository, card_phrasing),
         submit_feedback=SubmitFeedback(ranker_store),
         chat=Chat(research_agent, graph_repository),

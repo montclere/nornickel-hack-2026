@@ -91,6 +91,16 @@ def test_full_graph(client):
     assert els["edges"][0]["data"]["quote"]  # клик по ребру → цитата
 
 
+def test_graph_pyvis_html(client):
+    pytest.importorskip("pyvis")
+    r = client.get("/graph/pyvis")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    body = r.text
+    assert "vis-network" in body  # инлайн vis.js (оффлайн-страница)
+    assert "Ni_recovery" in body  # узлы графа попали в страницу (id в данных vis.js)
+
+
 def test_unknown_ids_404(client):
     assert client.get("/graph/path/nope").status_code == 404
     assert client.get("/agent/trace/nope").status_code == 404

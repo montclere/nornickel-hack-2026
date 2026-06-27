@@ -67,6 +67,19 @@ def compute_snapshot_id(triplets: list[Triplet]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
+def graph_snapshot_id(repo: GraphRepository) -> str:
+    """Стабильный хеш текущего состояния графа (по рёбрам).
+
+    Используется после сборки/дозаполнения: добавил факты в граф → новый
+    snapshot_id. Тот же набор рёбер → тот же id, поэтому генерация воспроизводима.
+    """
+    keys = sorted(
+        (e.source, e.target, e.sign, e.year, e.doc_id) for e in repo.all_edges()
+    )
+    blob = json.dumps(keys, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
 __all__ = [
     "find_paths",
     "find_neighbors",
@@ -74,4 +87,5 @@ __all__ = [
     "find_failures",
     "resolve_kpi_node",
     "compute_snapshot_id",
+    "graph_snapshot_id",
 ]

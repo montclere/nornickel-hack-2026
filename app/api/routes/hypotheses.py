@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
 
 from app.api.routes.deps import get_state
 from app.api.schemas import GenerateRequest
@@ -20,6 +21,25 @@ def generate(req: GenerateRequest, state: AppState = Depends(get_state)):
     hypotheses = state.container.generate_hypotheses.execute(req.kpi)
     state.store_hypotheses(hypotheses)
     return hypotheses
+
+
+@router.get("/graph/pyvis", response_class=HTMLResponse)
+def graph_pyvis(state: AppState = Depends(get_state)):
+    """Полный граф знаний как интерактивная HTML-страница (Pyvis/vis.js).
+
+    Фронт встраивает её в <iframe>. Физика, перетаскивание, подсветка окрестности
+    при наведении; цитаты и первоисточники — во всплывающих подсказках рёбер.
+    """
+    state.build_graph()
+    repo = state.container.graph_repository
+    try:
+        from app.api.pyvis_view import build_graph_html
+    except ImportError as exc:  # pyvis не установлен
+        raise HTTPException(
+            status_code=503,
+            detail="Pyvis не установлен: pip install -e '.[infra]'",
+        ) from exc
+    return HTMLResponse(content=build_graph_html(repo.all_nodes(), repo.all_edges()))
 
 
 @router.get("/graph")

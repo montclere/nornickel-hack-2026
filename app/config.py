@@ -24,6 +24,25 @@ SCANS_DIR = DATA_DIR / "scans"
 FIXTURES_DIR = ROOT_DIR / "fixtures"
 OUTPUTS_DIR = ROOT_DIR / "outputs"
 
+
+def _load_dotenv(path: Path) -> None:
+    """Подтянуть ключи из .env (gitignored) в окружение, не переопределяя заданные.
+
+    Минимальный лоадер без зависимостей: KEY=VALUE по строкам, # — комментарий.
+    Делает GROQ_API_KEY/ANTHROPIC_API_KEY доступными и скриптам, и uvicorn.
+    """
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_dotenv(ROOT_DIR / ".env")
+
 # имена переменных окружения для покомпонентного переключения (mix-режим)
 _COMPONENT_ENV = {
     "ocr": "PHOENIX_OCR",
@@ -56,7 +75,10 @@ class Settings(BaseModel):
     # имена моделей (адаптеры infrastructure)
     ocr_model: str = "baidu/Unlimited-OCR"
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    extractor_model: str = "claude-sonnet-4-6"  # высокий объём извлечения
+    # извлечение фактов — через OpenAI-совместимый API (по умолчанию Groq);
+    # base_url/модель меняются под другого провайдера без правок кода.
+    llm_base_url: str = "https://api.groq.com/openai/v1"
+    extractor_model: str = "llama-3.3-70b-versatile"
     phrasing_model: str = "claude-opus-4-8"  # качество формулировок карточек
     agent_model: str = "claude-opus-4-8"
 
