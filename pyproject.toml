@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phoenix"
+version = "0.1.0"
+description = "«Феникс» — фабрика научно-исследовательских гипотез для R&D ГМК «Норильский никель» (хакатон-MVP)"
+readme = "README.md"
+requires-python = ">=3.11"
+# Ядро скелета зависит только от pydantic. Тяжёлые библиотеки слоёв вынесены в
+# extras, чтобы `pip install -e .` и оффлайн-pytest оставались лёгкими и быстрыми.
+dependencies = [
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+# чистое ядро service/domain
+domain = [
+    "networkx>=3.0",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
+]
+# реальные адаптеры infrastructure
+infra = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "httpx>=0.27",
+    "anthropic>=0.40",
+    "sentence-transformers>=2.2",
+    "pymupdf>=1.23",
+    "langgraph>=0.2",
+    "pyvis>=0.3",
+]
+# слой данных: OpenAlex-источник + рендер PDF-сканов для OCR
+data = [
+    "httpx>=0.27",
+    "pillow>=10.0",
+]
+# Фронтенд — отдельный React+Vite-проект в frontend/ (Node, не Python). См. frontend/README.md.
+dev = [
+    "pytest>=7.4",
+    "import-linter>=2.0",
+    "ruff>=0.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+# Контракт изоляции ядра для import-linter (`lint-imports`). Дублируется быстрым
+# offline-тестом tests/test_isolation.py, не требующим установки import-linter.
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "Чистое ядро service/domain не зависит от infrastructure/api"
+type = "forbidden"
+source_modules = ["app.service.domain"]
+forbidden_modules = ["app.infrastructure", "app.api"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
