@@ -20,6 +20,40 @@ from factory.config import LLM_MAX_RETRIES, YANDEX_BASE_URL, YANDEX_MODEL, load_
 _RETRY_CODES = {429, 500, 502, 503, 504}
 
 
+def _retry_after(err):
+    try:
+        return float(err.headers.get("Retry-After"))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def post_json(url, payload, headers, timeout=90, max_retries=LLM_MAX_RETRIES):
+    """POST JSON с экспоненциальным backoff на 429/5xx/сетевые сбои (учитывает Retry-After).
+
+    Общий транспорт для всех сервисов Yandex (LLM, эмбеддинги, OCR)."""
+    req = urllib.request.Request(
+        url, data=json.dumps(payload).encode("utf-8"),
+        headers={**headers, "Content-Type": "application/json"}, method="POST")
+    last = None
+    for attempt in range(max_retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code not in _RETRY_CODES or attempt == max_retries:
+                raise
+            ra = _retry_after(e)
+            delay = ra if ra is not None else min(2 ** attempt, 30)
+            last = e
+        except urllib.error.URLError as e:          # SSL/обрыв соединения — тоже повторяем
+            if attempt == max_retries:
+                raise
+            delay = min(2 ** attempt, 30)
+            last = e
+        time.sleep(delay)
+    raise last                                      # недостижимо, но явно
+
+
 class Yandex:
     """Клиент Yandex AI Studio: chat + эмбеддинги. Для извлечения сущностей и новизны."""
 
@@ -34,36 +68,8 @@ class Yandex:
         return bool(self.key and self.folder)
 
     def _post(self, path, payload, timeout=90):
-        """POST с экспоненциальным backoff на 429/5xx/сетевые сбои (учитывает Retry-After)."""
-        req = urllib.request.Request(
-            f"{YANDEX_BASE_URL}/{path}", data=json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Api-Key {self.key}",
-                     "Content-Type": "application/json"}, method="POST")
-        last = None
-        for attempt in range(LLM_MAX_RETRIES + 1):
-            try:
-                with urllib.request.urlopen(req, timeout=timeout) as r:
-                    return json.loads(r.read().decode("utf-8"))
-            except urllib.error.HTTPError as e:
-                if e.code not in _RETRY_CODES or attempt == LLM_MAX_RETRIES:
-                    raise
-                ra = self._retry_after(e)
-                delay = ra if ra is not None else min(2 ** attempt, 30)
-                last = e
-            except urllib.error.URLError as e:      # SSL/обрыв соединения — тоже повторяем
-                if attempt == LLM_MAX_RETRIES:
-                    raise
-                delay = min(2 ** attempt, 30)
-                last = e
-            time.sleep(delay)
-        raise last                                  # недостижимо, но явно
-
-    @staticmethod
-    def _retry_after(err):
-        try:
-            return float(err.headers.get("Retry-After"))
-        except (TypeError, ValueError, AttributeError):
-            return None
+        return post_json(f"{YANDEX_BASE_URL}/{path}", payload,
+                         {"Authorization": f"Api-Key {self.key}"}, timeout)
 
     def complete(self, system, user, timeout=90):
         payload = {"modelUri": f"gpt://{self.folder}/{self.model}",

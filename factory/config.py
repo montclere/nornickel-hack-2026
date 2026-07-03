@@ -48,3 +48,13 @@ LLM_MAX_RETRIES = int(os.environ.get("FACTORY_LLM_RETRIES", "4"))        # backo
 # поэтому модель судьи вынесена отдельно и переопределяется через env.
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", YANDEX_MODEL)
 JUDGE_CACHE = os.path.join(OUTPUTS_DIR, "judge_cache.json")
+
+# --- OCR (Yandex Vision) — картинки и сканы PDF → текст ---
+OCR_ENABLED = os.environ.get("FACTORY_OCR", "1") not in ("0", "false", "no", "off")
+OCR_BASE_URL = os.environ.get("YANDEX_OCR_URL", "https://ocr.api.cloud.yandex.net")
+OCR_MODEL = os.environ.get("OCR_MODEL", "page")           # page | table | handwritten
+OCR_LANGS = [s for s in os.environ.get("OCR_LANGS", "ru,en").split(",") if s]
+OCR_DPI = int(os.environ.get("OCR_DPI", "200"))           # растеризация страниц PDF под OCR
+OCR_MIN_CHARS = int(os.environ.get("OCR_MIN_CHARS", "8"))  # короче — считаем «пусто»
+OCR_PDF_MAX_PAGES = int(os.environ.get("OCR_PDF_MAX_PAGES", "20"))  # предохранитель от скан-книг
+OCR_CACHE = os.path.join(OUTPUTS_DIR, "ocr_cache.json")
