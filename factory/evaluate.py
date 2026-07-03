@@ -4,7 +4,7 @@
 Сравнение по СЕМЕЙСТВУ вмешательства (устойчиво к формулировке), без LLM и эмбеддингов.
 Показывает, какие эталонные направления покрыты нашими гипотезами.
 
-Запуск:  python -m factory.evaluate data/Хвосты\\ ТОФ_2.xlsx data/Гипотезы\\ ТОФ.docx
+Запуск:  python -m factory.evaluate data/Хвосты\\ ТОФ_2.xlsx data/Гипотезы\\ ТОФ.docx ["свой KPI"]
 """
 from __future__ import annotations
 
@@ -15,6 +15,12 @@ import sys
 import zipfile
 
 from factory.pipeline import HypothesisFactory
+
+# Это регрессионный тест диагностики (сверка с эталоном инженеров), а не ответ на
+# бизнес-вопрос пользователя — поэтому единственный явный, ВИДИМЫЙ здесь тестовый KPI,
+# а не скрытый дефолт из конфига. Эталонные пары в этом кейсе — про Ni. Свой KPI можно
+# передать третьим аргументом.
+_GOLDEN_TEST_KPI = "снизить потери никеля (регрессионный тест family-coverage)"
 
 FAMILIES = {
     "измельчение/раскрытие": ["футеровк", "мельниц", "измельч", "доизмельч", "раскрыт",
@@ -48,10 +54,11 @@ def golden_lines(path: str):
 
 def main():
     if len(sys.argv) < 3:
-        print("usage: python -m factory.evaluate <отчёт.xlsx> <Гипотезы.docx>"); return
+        print("usage: python -m factory.evaluate <отчёт.xlsx> <Гипотезы.docx> [\"KPI\"]"); return
     report, golden_path = sys.argv[1], sys.argv[2]
+    kpi = sys.argv[3] if len(sys.argv) > 3 else _GOLDEN_TEST_KPI
 
-    hyps = HypothesisFactory(report).run()["hypotheses"]
+    hyps = HypothesisFactory(report, kpi=kpi).run()["hypotheses"]
     our_fams = {family_of(f"{h.family} {h.intervention} {h.statement_if}") for h in hyps}
     our_fams |= {family_of(a) for h in hyps for a in h.alternatives}
     our_fams -= {None}

@@ -4,7 +4,14 @@
 Стратегии (без LLM в логике):
   gaps      — разрывы Свонсона: A→B и B→C есть, прямого A→C нет → скрытая связь;
   novelty   — редкость: чем меньше связность концов, тем новее (структурная новизна).
-Ранжирование прозрачно: novelty · relevance · (знак-согласованность).
+Ранжирование прозрачно: novelty · relevance · (знак-согласованность) · action-бонус.
+
+is_action (проставлен в extract.py по классификации LLM, ПРОВЕРЯЕТСЯ не здесь, а там —
+цитатным гейтом на исходный факт) — является ли рычаг (A) конкретным промышленным
+действием (оборудование/реагент/режим), а не абстрактным научным свойством. Такие
+гипотезы получают бонус к рангу и формулируются как рекомендация «внедрить», а не как
+нейтральное «исследовать влияние» — это и есть смещение генерации в сторону
+промышленных действий, а не абстракций, при том же цитатном заземлении.
 """
 from __future__ import annotations
 
@@ -34,6 +41,8 @@ class Discovery:
     chain: list                      # [(edge_data), (edge_data)]
     novelty: float = 0.0
     relevance: float = 0.0
+    is_action: bool = False          # A — промышленное действие, а не абстрактный факт
+    role: str = "reference"          # "state" (факт про ЭТУ фабрику) vs "reference" (общая теория)
     score: float = 0.0
     statement_if: str = ""
     statement_then: str = ""
@@ -63,17 +72,34 @@ def find_gaps(kg, thr=0.5):
 
 
 def find_direct(kg, kpi_tokens, thr=1):
-    """Прямые рычаги: связь, чей ОБЪЕКТ близок к KPI → гипотеза «влиять на цель через X».
-    Работает даже на разреженном графе (не нужны цепочки)."""
+    """Прямые рычаги: связь, релевантная KPI → гипотеза «влиять на цель через X».
+    Релевантность ищем в объекте, субъекте И цитате (не только в объекте) — иначе
+    короткий KPI не пересекается лексически ни с чем. Работает на разреженном графе."""
     out, seen = [], set()
     for u, v, d in kg.g.edges(data=True):
-        if len(_tokens(v) & kpi_tokens) < thr:      # объект связан с целью KPI
+        hay = _tokens(v) | _tokens(u) | _tokens(d.get("quote", ""))
+        if len(hay & kpi_tokens) < thr:
             continue
         if (u, v) in seen:
             continue
         seen.add((u, v))
         out.append((u, kg.label(v), v, d.get("sign", 0), [d]))
     return out
+
+
+def _all_as_direct(kg):
+    """Все связи как прямые кандидаты (fallback, когда KPI лексически не пересёкся)."""
+    return [(u, kg.label(v), v, d.get("sign", 0), [d]) for u, v, d in kg.g.edges(data=True)]
+
+
+# не-действие → штраф, чтобы промышленные рычаги систематически ранжировались выше
+# абстрактных научных фактов при сходных novelty/relevance (не скрываем последние —
+# просто честно отодвигаем и иначе формулируем, см. ниже)
+_NON_ACTION_PENALTY = 0.6
+# факт про ЭТУ фабрику (role="state") — точнее общей теории, скромный бонус к рангу.
+# Сегодня почти все источники — "reference" (книги в materials/reference/), эффект
+# проявится, когда в materials появится проза про конкретную фабрику (см. ingest.py)
+_STATE_BONUS = 1.15
 
 
 def score(kg, cands, kpi_tokens=None, kind="gap"):
@@ -84,13 +110,27 @@ def score(kg, cands, kpi_tokens=None, kind="gap"):
         novelty = round(1.0 / (1 + deg), 3)
         relevance = round(len(_tokens(c) & kpi_tokens) / (len(kpi_tokens) or 1), 3) \
             if kpi_tokens else 0.5
+        # действие/роль рычага (A) — берём из ПЕРВОГО ребра цепочки, у него subject == A
+        is_action = bool(chain[0].get("is_action", False))
+        role = chain[0].get("role", "reference")
+        base = novelty * (0.4 + 0.6 * (relevance or 0.2))
+        base = base if is_action else base * _NON_ACTION_PENALTY
+        base = base * _STATE_BONUS if role == "state" else base
         d = Discovery(a=kg.label(a), b=kg.label(b) if kind == "gap" else "",
                       c=kg.label(c), sign=sign, chain=chain,
-                      novelty=novelty, relevance=relevance,
-                      score=round(novelty * (0.4 + 0.6 * (relevance or 0.2)), 4),
+                      novelty=novelty, relevance=relevance, is_action=is_action, role=role,
+                      score=round(base, 4),
                       sources=sorted({e.get("locator", "") for e in chain}))
-        d.statement_if = f"воздействовать на «{d.c}» через «{d.a}»"
-        d.statement_then = ("повысит" if sign > 0 else "снизит" if sign < 0 else "изменит") + f" «{d.c}»"
+        verb = "повысит" if sign > 0 else "снизит" if sign < 0 else "изменит"
+        if is_action:
+            # промышленное действие — формулируем как рекомендацию к внедрению
+            d.statement_if = f"внедрить/применить «{d.a}» (целевой параметр «{d.c}»)"
+            d.statement_then = f"{verb} «{d.c}»"
+        else:
+            # абстрактный научный факт — честно НЕ выдаём за готовое действие
+            d.statement_if = f"исследовать применимость к фабрике: «{d.a}» → «{d.c}»"
+            d.statement_then = (f"фактор, потенциально влияющий на «{d.c}» "
+                                f"(требует уточнения, чем это реализовать на фабрике)")
         if kind == "gap":
             d.statement_because = (f"«{d.a}»→«{d.b}» и «{d.b}»→«{d.c}», но прямой связи "
                                    f"«{d.a}»→«{d.c}» в корпусе нет (разрыв Свонсона)")
@@ -102,16 +142,23 @@ def score(kg, cands, kpi_tokens=None, kind="gap"):
     return res
 
 
+def _dedup(discoveries):
+    seen, out = set(), []
+    for d in discoveries:
+        key = (d.a.lower(), d.c.lower())
+        if key in seen:
+            continue
+        seen.add(key); out.append(d)
+    return out
+
+
 def discover(kg, kpi="", limit=10):
     kt = _tokens(kpi)
     gaps = score(kg, find_gaps(kg), kt, kind="gap")
     direct = score(kg, find_direct(kg, kt), kt, kind="direct")
-    # дедуп по (a,c); разрывы приоритетнее прямых
-    seen, merged = set(), []
-    for d in gaps + direct:
-        key = (d.a.lower(), d.c.lower())
-        if key in seen:
-            continue
-        seen.add(key); merged.append(d)
-    merged.sort(key=lambda x: -x.score)
+    merged = _dedup(gaps + direct)   # разрывы приоритетнее прямых (у них выше relevance)
+    if len(merged) < limit and kg.g.number_of_edges():
+        # добираем ведущими связями по новизне (KPI-независимо), релевантные — выше
+        merged = _dedup(merged + score(kg, _all_as_direct(kg), kt, kind="direct"))
+    merged.sort(key=lambda x: (-x.relevance, -x.score))
     return merged[:limit]

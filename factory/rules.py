@@ -9,10 +9,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from factory.reader import LIBERATED, LOCKED
+from factory.reader import LIBERATED, LOCKED, class_upper_micron
+from factory.schema import DEFAULT_SCHEMA
 
-# крупные классы — зона недораскрытия; тонкие — зона шламов
-FINE_CLASSES = {"-20+10", "-10"}
+
+def _is_fine(size_class: str, threshold_micron: float = DEFAULT_SCHEMA.fine_class_max_micron) -> bool:
+    """Тонкий класс (зона шламов) — по числовой границе из схемы, НЕ по белому списку
+    имён. Обобщается на любую разбивку по крупности автоматически."""
+    upper = class_upper_micron(size_class)
+    return upper is not None and upper <= threshold_micron
 
 # почему металл в этой форме теряется (для форм-специфичной диагностики)
 FORM_NOTES = {
@@ -45,7 +50,7 @@ def diagnose(dominant_form: str | None, size_class: str) -> Diagnosis | None:
     """Детерминированный диагноз по доминирующей извлекаемой форме и крупности."""
     if dominant_form is None:
         return None
-    is_fine = size_class in FINE_CLASSES
+    is_fine = _is_fine(size_class)
 
     if dominant_form == LOCKED:
         return Diagnosis(

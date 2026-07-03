@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import html
 
-from factory.config import DEFAULT_KPI
-
 
 def _esc(x):
     return html.escape(str(x if x is not None else ""))
@@ -87,11 +85,18 @@ def _card(h):
     alts = "".join(f"<li>{_esc(a)}</li>" for a in h.alternatives)
     ev = "".join(f'<div class="ev"><span>{_esc(e["label"])}</span>'
                  f'<em>{_esc(e["cell"])}</em></div>' for e in h.evidence)
+    src = "".join(f"<li>{_esc(s)}</li>" for s in h.sources)
+    warn = ""
+    if h.violates_constraints:
+        warn = (f'<div class="warn">⚠ нарушает ограничение из запроса: '
+               f'{_esc(", ".join(h.violates_constraints))} — приоритет намеренно занижен, '
+               f'но гипотеза не скрыта</div>')
+    wp = h.world_practice or "подключается модуль веб-поиска (пока не реализован)"
     return f"""
     <article class="card">
       <div class="chead">
         <div class="rank">#{h.rank}</div>
-        <div class="money">{impact_pct}%<span>извлекаемых потерь фабрики</span></div>
+        <div class="money">{impact_pct}%<span>извлекаемых потерь {_esc(h.target_element)} по фабрике</span></div>
         <div class="fam">{_esc(h.family)}</div>
       </div>
       <div class="tri">
@@ -100,6 +105,7 @@ def _card(h):
         <div class="row"><span class="lab because">потому что</span>
           <p class="muted">{_esc(h.statement_because)}</p></div>
       </div>
+      {warn}
       <div class="bars">
         <div class="bar-row"><div class="bar-head"><span>impact — масштаб потери</span><b>{impact_pct}%</b></div>
           <div class="bar"><i style="width:{min(m['impact']*100,100):.0f}%"></i></div></div>
@@ -113,7 +119,10 @@ def _card(h):
         </div>
       </div>
       <div class="alts"><b>Альтернативы:</b><ul>{alts}</ul></div>
+      <div class="exp"><b>Эксперимент:</b><p>{_esc(h.experiment)}</p></div>
       <div class="evidence"><b>Заземление (ячейки отчёта):</b>{ev}</div>
+      <div class="src"><b>Источники метода:</b><ul>{src}</ul></div>
+      <div class="wp"><b>Мировая практика:</b><p class="muted">{_esc(wp)}</p></div>
     </article>"""
 
 
@@ -152,10 +161,11 @@ def _analysis_html(a):
         f'<td>{_esc(r["form"])}</td><td>{r["tonnes"]} т</td><td>{r["share_pct"]}%</td>'
         f'<td>{_esc(r["status"])}</td><td class="why">{_esc(r["why"])}</td></tr>'
         for r in a.get("forms", []))
+    el = a.get("element", "Ni")
     return f"""
   <div class="panel">
-    <h2>Кривая раскрытия по крупности</h2>
-    <div class="h-sub">как меняется форма Ni с размером частиц (данные отчёта, детерминированно)</div>
+    <h2>Кривая раскрытия по крупности ({_esc(el)})</h2>
+    <div class="h-sub">как меняется форма {_esc(el)} с размером частиц (данные отчёта, детерминированно)</div>
     {_liberation_svg(a.get("liberation", []))}
     <div class="legend">
       <span><i style="background:#1f7ae0"></i>закрытый Pnt (заперт в сростках)</span>
@@ -164,9 +174,9 @@ def _analysis_html(a):
     {grind_html}{tos}
   </div>
   <div class="panel">
-    <h2>Куда физически уходит Ni (по формам)</h2>
-    <div class="h-sub">не всё извлекаемо: часть Ni в силикатах/пирротине — потолок реального извлечения</div>
-    <table class="forms"><thead><tr><th></th><th>форма</th><th>т Ni</th><th>доля</th>
+    <h2>Куда физически уходит {_esc(el)} (по формам)</h2>
+    <div class="h-sub">не всё извлекаемо: часть {_esc(el)} в силикатах/пирротине — потолок реального извлечения</div>
+    <table class="forms"><thead><tr><th></th><th>форма</th><th>т {_esc(el)}</th><th>доля</th>
       <th>статус</th><th>почему</th></tr></thead><tbody>{forms}</tbody></table>
   </div>"""
 
@@ -224,6 +234,13 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .pill b{{font-size:15px;font-weight:800}} .pill span{{font-size:10px;color:var(--muted)}}
 .alts{{font-size:13px;margin:10px 0}} .alts b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .alts ul{{margin:5px 0 0;padding-left:18px;color:#37505c}} .alts li{{margin:2px 0}}
+.exp{{font-size:13px;margin:10px 0;background:#f6fbfd;border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px}}
+.exp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}} .exp p{{margin:4px 0 0}}
+.src{{font-size:12px;margin:10px 0}} .src b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.src ul{{margin:5px 0 0;padding-left:18px;color:#37505c}} .src li{{margin:2px 0}}
+.wp{{font-size:12px;margin:10px 0}} .wp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.wp p{{margin:4px 0 0;font-style:italic}}
 .evidence{{font-size:12px;margin-top:8px}} .evidence>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .ev{{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed var(--line)}}
 .ev em{{color:#9db3bf;font-style:normal}}
@@ -244,7 +261,7 @@ footer a{{color:var(--blue);text-decoration:none}}
   <h1>Фабрика <span>гипотез</span> · {_esc(profile.fabric)}</h1>
   <div class="sub">детерминированный граф из данных · метрики и логика воспроизводимы · LLM только оформляет текст</div>
   {"".join(f'<div class="warn">⚠ {_esc(w)}</div>' for w in getattr(profile, "warnings", []))}
-  <div class="kpi"><b>KPI</b> &nbsp;{_esc(kpi or DEFAULT_KPI)}</div>
+  <div class="kpi"><b>KPI</b> &nbsp;{_esc(kpi)}</div>
   <div class="summary">
     <span><b>{total_ni} т</b><br>извлекаемого Ni в хвостах (факт)</span>
     <span><b>{total_cu} т</b><br>извлекаемого Cu в хвостах (факт)</span>

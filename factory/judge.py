@@ -1,25 +1,35 @@
 # -*- coding: utf-8 -*-
-"""LLM-as-judge — качественная метрика ветки Б (гипотезы из discover.py).
+"""LLM-as-judge — качественная метрика ВСЕХ гипотез системы (ветка А + ветка Б).
 
-Зачем: у детерминированной ветки А есть golden-бенчмарк, у ветки Б метрики не было.
-Судья читает КАЖДУЮ сгенерированную гипотезу вместе с её источниками-цитатами и
-выставляет баллы по фиксированной рубрике. Это ОЦЕНОЧНЫЙ слой: он НЕ участвует в
-ранжировании (инвариант проекта — LLM не в рассуждении), а лишь измеряет качество.
+Судья читает КАЖДУЮ гипотезу — и детерминированную (хвосты, generator.Hypothesis), и
+литературную (discover.Discovery) — вместе с её заземлением (ячейки отчёта или
+дословные цитаты) и выставляет баллы по фиксированной рубрике. Это ОЦЕНОЧНЫЙ слой: он
+НЕ участвует в генерации/ранжировании (инвариант проекта — LLM не в рассуждении), а
+только измеряет качество того, что уже построено детерминированно.
+
+Обе ветки объединяются, потому что рубрика domain-агностична (обоснованность,
+правдоподобность, релевантность KPI, неочевидность, проверяемость) — не важно, из
+Excel гипотеза или из литературы. Ветка А отдельно ещё проверяется golden-бенчмарком
+(benchmark.py); судья даёт вторую, независимую от эталона ось качества.
 
 Воспроизводимость:
   • temperature=0;
   • каждый вердикт кэшируется по отпечатку (рубрика+KPI+текст гипотезы) → тот же
     вход даёт тот же балл и не тратит квоту повторно (как кэш извлечения).
 
-Заземление: судья видит дословные цитаты источников гипотезы, поэтому оценивает
-ОБОСНОВАННОСТЬ, а не только поверхностную правдоподобность.
+Точка роста в полноценного критика: `HypothesisJudge.judge_one` — единственное место,
+где гипотеза встречается с LLM для оценки. Сюда естественно добавляются: сверка с
+кладбищем провалов (не повторяет ли гипотеза уже отклонённое направление), детекция
+противоречий между гипотезами одного прогона, конкретные правки к формулировке. Пока
+судья только скорит; следующий шаг — возвращать структурированные замечания.
 
 Замечание о смещении: по умолчанию судья — та же модель Yandex, что и экстрактор,
 т.е. возможно self-preference bias. Модель судьи вынесена в JUDGE_MODEL и заменяема —
 для строгой оценки поставьте судью сильнее/иного семейства.
 
 Запуск:
-    uv run python -m factory.judge materials/reference --kpi "снизить потери никеля"
+    uv run python -m factory.judge --kpi "снизить потери никеля"          # ветки А+Б
+    uv run python -m factory.judge --no-tailings --literature materials/reference/books
 """
 from __future__ import annotations
 
@@ -28,7 +38,7 @@ import hashlib
 import json
 import os
 
-from factory.config import JUDGE_CACHE, JUDGE_MODEL, DEFAULT_KPI, MAX_CHUNK_CHARS, OUTPUTS_DIR
+from factory.config import DEFAULT_CACHE, JUDGE_CACHE, JUDGE_MODEL, MAX_CHUNK_CHARS
 from factory.llm import Yandex, extract_json
 
 RUBRIC_VERSION = "v1"
@@ -68,15 +78,24 @@ PROMPT = """KPI (цель): {kpi}
 
 
 def _quotes_block(d) -> str:
-    """Дословные цитаты из цепочки связей гипотезы (с локатором-провенансом)."""
+    """Заземление гипотезы для судьи — под обе ветки:
+    • ветка Б (Discovery.chain)   — дословные цитаты источника с локатором;
+    • ветка А (Hypothesis.evidence) — метка+ячейка отчёта (грунт без текстовой цитаты,
+      т.к. источник — числа Excel, а не проза)."""
     seen, lines = set(), []
-    for e in getattr(d, "chain", []) or []:
+    for e in getattr(d, "chain", None) or []:
         q = (e.get("quote") or "").strip()
         if not q or q in seen:
             continue
         seen.add(q)
         loc = e.get("locator") or e.get("source") or ""
         lines.append(f"  — «{q[:400]}»" + (f" [{loc}]" if loc else ""))
+    if lines:
+        return "\n".join(lines)
+    for e in getattr(d, "evidence", None) or []:
+        label, cell = e.get("label", ""), e.get("cell", "")
+        if label:
+            lines.append(f"  — {label}" + (f" [ячейка {cell}]" if cell else ""))
     return "\n".join(lines) if lines else "  (прямых цитат нет — структурный вывод графа)"
 
 
@@ -182,65 +201,148 @@ class HypothesisJudge:
         return agg
 
 
-def _branch_b(paths, kpi, max_chunks, cache_path, log):
-    """Ветка Б: приём → извлечение → граф → discover. Возвращает список Discovery."""
+def _branch_b(cache_path, kpi, log):
+    """Ветка Б: ЧИТАЕТ кэш графа (наполняет его только flex.py — см. модуль-докстринг
+    extract.py) → discover. Своих LLM-вызовов не делает: нет кэша → пустой список,
+    а не тихая переизвлечение с другими дефолтами (что и путало кэш раньше)."""
     from factory.discover import discover
-    from factory.extract import extract_relations
-    from factory.ingest import ingest, split
+    from factory.extract import load_cached_relations
     from factory.kgraph import KnowledgeGraph
 
-    chunks = split(ingest(paths))
-    rels = extract_relations(chunks, max_chunks=max_chunks, query=kpi,
-                             cache_path=cache_path, log=log)
+    rels = load_cached_relations(cache_path, log)
+    if not rels:
+        log(f"  → нет данных: сначала запустите "
+            f"'python -m factory.flex <материалы> --kpi \"...\"'")
+        return []
     kg = KnowledgeGraph(rels)
-    log(f"граф: {kg.stats()}")
+    log(f"граф из кэша: {kg.stats()}")
     return discover(kg, kpi=kpi, limit=8)
 
 
+def _branch_a(fabrics_dir, kpi, log):
+    """Ветка А: детерминированные гипотезы по КАЖДОЙ фабрике (Хвосты*.xlsx).
+    Возвращает [(fabric, Hypothesis), ...] — метка фабрики нужна только для отчёта."""
+    import glob
+
+    from factory.pipeline import HypothesisFactory
+
+    out = []
+    for xlsx in sorted(glob.glob(os.path.join(fabrics_dir, "*", "Хвосты*.xlsx"))):
+        res = HypothesisFactory(xlsx, kpi=kpi).run()
+        fabric = res["profile"].fabric
+        log(f"  хвосты/{fabric}: {len(res['hypotheses'])} гипотез")
+        out.extend((fabric, h) for h in res["hypotheses"])
+    return out
+
+
+def _aggregate_by_branch(items) -> dict:
+    from collections import defaultdict
+    buckets = defaultdict(list)
+    for it in items:
+        buckets[it.get("branch", "?")].append(it)
+    return {label: HypothesisJudge._aggregate(its) for label, its in buckets.items()}
+
+
+def judge_everything(fabrics_dir=None, cache_path=None, kpi="", judge_cache=JUDGE_CACHE,
+                     include_tailings=True, include_literature=True,
+                     log=lambda *a: None) -> dict | None:
+    """Собрать гипотезы ОБЕИХ веток и оценить одним судьёй.
+
+    Ветка А (хвосты) считается на месте — она детерминирована и дешёвая (никакого LLM).
+    Ветка Б (литература) НЕ извлекается заново — читается из `cache_path`, который
+    наполняет только `flex.py`. Нет кэша → ветка Б просто пуста, судья честно оценит
+    то, что есть. Используется и из judge.main(), и из benchmark.py.
+
+    None — если судья недоступен (нет ключа) или вообще нечего оценивать."""
+    judge = HypothesisJudge()
+    if not judge.ready:
+        return None
+
+    records = []
+    if include_tailings and fabrics_dir:
+        for fabric, h in _branch_a(fabrics_dir, kpi, log):
+            records.append({"branch": "хвосты", "fabric": fabric, "obj": h})
+    if include_literature:
+        for d in _branch_b(cache_path, kpi, log):
+            records.append({"branch": "литература", "fabric": None, "obj": d})
+    if not records:
+        return None
+
+    res = judge.judge([r["obj"] for r in records], kpi=kpi, cache_path=judge_cache, log=log)
+    for r, item in zip(records, res["items"]):
+        item["branch"], item["fabric"] = r["branch"], r["fabric"]
+    res["records"] = records
+    res["by_branch"] = _aggregate_by_branch(res["items"])
+    return res
+
+
 def main():
-    ap = argparse.ArgumentParser(description="LLM-as-judge: оценка гипотез ветки Б")
-    ap.add_argument("paths", nargs="+", help="файлы/папки с литературой (знание)")
-    ap.add_argument("--kpi", default=DEFAULT_KPI)
-    ap.add_argument("--max-chunks", type=int, default=14)
-    ap.add_argument("--extract-cache", default=os.path.join(OUTPUTS_DIR, "kb_cache.json"))
+    ap = argparse.ArgumentParser(
+        description="LLM-as-judge: оценка ВСЕХ гипотез системы (хвосты + литература). "
+                    "Ветку Б наполняет ТОЛЬКО flex.py — запустите его первым.")
+    ap.add_argument("--fabrics", default=os.path.join("materials", "fabrics"),
+                    help="папка с фабриками (Хвосты*.xlsx) — ветка А")
+    ap.add_argument("--cache", default=DEFAULT_CACHE,
+                    help="кэш графа, наполненный 'python -m factory.flex ...' — ветка Б")
+    ap.add_argument("--no-tailings", action="store_true", help="не оценивать ветку А")
+    ap.add_argument("--no-literature", action="store_true", help="не оценивать ветку Б")
+    ap.add_argument("--kpi", default="", help="KPI для судьи; если не задан — берётся из "
+                    "конфига последнего flex-запуска. Судья оценивает релевантность "
+                    "гипотез ЭТОЙ цели")
     ap.add_argument("--judge-cache", default=JUDGE_CACHE)
-    ap.add_argument("--no-cache", action="store_true", help="не читать/писать кэши")
+    ap.add_argument("--no-cache", action="store_true", help="не кэшировать вердикты судьи")
     args = ap.parse_args()
+
+    # KPI: явный --kpi побеждает, иначе — конфиг последнего flex-запуска; источник объявляем
+    from factory.runconfig import resolve_kpi
+    kpi, kpi_source = resolve_kpi(args.kpi)
+    if not kpi:
+        ap.error("--kpi не задан и не найден в конфиге последнего запуска "
+                 f"({kpi_source}). Запустите сначала 'python -m factory.flex ... --kpi "
+                 "\"...\"' либо передайте --kpi здесь.")
 
     log = lambda m: print("  " + m)
     print("=" * 74)
-    print("LLM-AS-JUDGE · ОЦЕНКА ГИПОТЕЗ ВЕТКИ Б")
-    print(f"KPI: {args.kpi}")
+    print("LLM-AS-JUDGE · ОЦЕНКА ВСЕХ ГИПОТЕЗ СИСТЕМЫ")
+    print(f"KPI: «{kpi}»  [источник: {kpi_source}]")
     print("=" * 74)
 
     judge = HypothesisJudge()
     if not judge.ready:
         print("⚠ нет ключа Yandex (.env) — судья недоступен."); return
 
-    ecache = None if args.no_cache else args.extract_cache
-    found = _branch_b(args.paths, args.kpi, args.max_chunks, ecache, log)
-    print(f"\nгипотез к оценке: {len(found)}\n")
-    if not found:
-        print("гипотез не найдено — нечего оценивать."); return
+    print("\nВЕТКА А · хвосты (детерминированные гипотезы)" if not args.no_tailings else "")
+    print("\nВЕТКА Б · литература (из кэша flex)" if not args.no_literature else "")
 
-    jcache = None if args.no_cache else args.judge_cache
-    res = judge.judge(found, kpi=args.kpi, cache_path=jcache, log=log)
+    res = judge_everything(
+        fabrics_dir=args.fabrics, cache_path=args.cache, kpi=kpi,
+        judge_cache=None if args.no_cache else args.judge_cache,
+        include_tailings=not args.no_tailings, include_literature=not args.no_literature,
+        log=log)
+    if res is None:
+        print("\nгипотез не найдено — нечего оценивать."); return
 
+    print(f"\nвсего гипотез к оценке: {len(res['records'])}")
     print("\n" + "─" * 74)
-    for it, d in zip(res["items"], found):
+    for r, it in zip(res["records"], res["items"]):
         v = it["verdict"]
+        tag = r["branch"] + (f"/{r['fabric']}" if r["fabric"] else "")
         if not v:
-            print(f"  · [нечитаемо] {d.statement_if}"); continue
+            print(f"  · [{tag}] [нечитаемо] {r['obj'].statement_if}"); continue
         dims = " ".join(f"{k[:4]}={v[k]['score']}" for k in DIMENSIONS)
-        print(f"  ■ судья={v['overall']}  {dims}")
-        print(f"     {d.statement_if}")
+        print(f"  ■ [{tag}] судья={v['overall']}  {dims}")
+        print(f"     {r['obj'].statement_if}")
+
     a = res["aggregate"]
     print("\n" + "=" * 74)
     if a.get("judged"):
         dims = " · ".join(f"{k}={a[k]}" for k in DIMENSIONS)
-        print(f"СУДЕЙСКИЙ БАЛЛ ВЕТКИ Б: {a['overall']}/5  "
+        print(f"СУДЕЙСКИЙ БАЛЛ (ВСЕ ГИПОТЕЗЫ): {a['overall']}/5  "
               f"(оценено {a['judged']}/{a['n']}, пропущено {a['skipped']})")
         print(f"по осям: {dims}")
+        for label, agg in res["by_branch"].items():
+            if agg.get("judged"):
+                print(f"  {label}: {agg['overall']}/5 (n={agg['judged']})")
     else:
         print("ни одной гипотезы не удалось оценить (LLM вернул нечитаемое).")
     print(f"рубрика {res['rubric_version']} · оценка вне ранжирования (LLM не в рассуждении)")

@@ -35,46 +35,50 @@ class Metrics:
 
 
 class Scorer:
-    """Считает безразмерные метрики по данным профиля. Все веса — явные."""
+    """Считает безразмерные метрики по данным профиля. Все веса — явные.
 
-    def _rec_total(self, cl) -> float:
-        return sum(cl.recoverable_tonnes(el) for el in ELEMENT_SYMBOLS)
+    `element` — целевой элемент KPI (см. intent.py); импакт/адресуемость/ясность
+    считаются ПО НЕМУ, а не по зашитому первому элементу отчёта. rec_tonnes в выводе
+    всё равно несёт оба элемента — для контекста на карточке."""
 
-    def _class_total(self, cl) -> float:
-        return sum(cl.tonnes.get(el) or 0.0 for el in ELEMENT_SYMBOLS)
+    def _rec_total(self, cl, element) -> float:
+        return cl.recoverable_tonnes(element)
 
-    def _clarity(self, cl) -> float:
+    def _class_total(self, cl, element) -> float:
+        return cl.tonnes.get(element) or 0.0
+
+    def _clarity(self, cl, element) -> float:
         """Доля доминирующей извлекаемой формы среди извлекаемых (ясность механизма)."""
         rec_forms = [f for f in cl.forms
-                     if f.element == PRIMARY_ELEMENT and f.recoverable and f.tonnes]
+                     if f.element == element and f.recoverable and f.tonnes]
         if not rec_forms:
             return 0.0
         tot = sum(f.tonnes for f in rec_forms)
         return max(f.tonnes for f in rec_forms) / tot if tot else 0.0
 
-    def confidence(self, cl) -> float:
-        forms = [f for f in cl.forms if f.element == PRIMARY_ELEMENT]
+    def confidence(self, cl, element) -> float:
+        forms = [f for f in cl.forms if f.element == element]
         if not forms:
             return 0.3
         return 1.0 if any(f.tonnes for f in forms) else 0.6
 
-    def score_all(self, profile, diagnoses: dict):
-        rec_by = {cl.size_class: self._rec_total(cl) for cl in profile.classes}
+    def score_all(self, profile, diagnoses: dict, element: str = PRIMARY_ELEMENT):
+        rec_by = {cl.size_class: self._rec_total(cl, element) for cl in profile.classes}
         total_rec = sum(rec_by.values()) or 1.0
         out = {}
         for cl in profile.classes:
             diag = diagnoses.get(cl.size_class)
-            rec = {el: cl.recoverable_tonnes(el) for el in ELEMENT_SYMBOLS}
+            rec = {el: cl.recoverable_tonnes(el) for el in ELEMENT_SYMBOLS}  # оба — для контекста
             impact = rec_by[cl.size_class] / total_rec
-            ctot = self._class_total(cl)
+            ctot = self._class_total(cl, element)
             addressability = (rec_by[cl.size_class] / ctot) if ctot else 0.0
             feas = 1.0 if (diag and not diag.needs_equipment) else 0.6
-            conf = self.confidence(cl)
+            conf = self.confidence(cl, element)
             adr = min(addressability, 1.0)
             # приоритет ВЕДЁТ масштаб (impact); излечимость модулирует ±, не доминирует
             priority = impact * (0.5 + 0.5 * adr) * feas * conf
             out[cl.size_class] = Metrics(
                 rec_tonnes=rec, impact=impact, addressability=adr,
-                clarity=self._clarity(cl), confidence=conf, feasibility=feas,
+                clarity=self._clarity(cl, element), confidence=conf, feasibility=feas,
                 priority=round(priority, 5))
         return out

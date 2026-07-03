@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import time
 import urllib.error
@@ -34,7 +35,10 @@ class Yandex:
         return bool(self.key and self.folder)
 
     def _post(self, path, payload, timeout=90):
-        """POST с экспоненциальным backoff на 429/5xx/сетевые сбои (учитывает Retry-After)."""
+        """POST с экспоненциальным backoff на 429/5xx/сетевые сбои (учитывает Retry-After).
+
+        Джиттер обязателен: без него параллельные воркеры считают ОДИНАКОВУЮ задержку
+        по одной формуле и просыпаются в один момент — синхронно бьют в лимит второй раз."""
         req = urllib.request.Request(
             f"{YANDEX_BASE_URL}/{path}", data=json.dumps(payload).encode("utf-8"),
             headers={"Authorization": f"Api-Key {self.key}",
@@ -48,12 +52,14 @@ class Yandex:
                 if e.code not in _RETRY_CODES or attempt == LLM_MAX_RETRIES:
                     raise
                 ra = self._retry_after(e)
-                delay = ra if ra is not None else min(2 ** attempt, 30)
+                base = ra if ra is not None else min(2 ** attempt, 30)
+                delay = base + random.uniform(0, base * 0.5 + 0.5)
                 last = e
             except urllib.error.URLError as e:      # SSL/обрыв соединения — тоже повторяем
                 if attempt == LLM_MAX_RETRIES:
                     raise
-                delay = min(2 ** attempt, 30)
+                base = min(2 ** attempt, 30)
+                delay = base + random.uniform(0, base * 0.5 + 0.5)
                 last = e
             time.sleep(delay)
         raise last                                  # недостижимо, но явно

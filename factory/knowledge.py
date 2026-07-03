@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import networkx as nx
 
-from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT, SIZE_ORDER
+from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT, class_sort_key
 
 
 class KnowledgeGraph:
@@ -48,8 +48,7 @@ class KnowledgeGraph:
         for n, d in self.g.nodes(data=True):
             layers[d["kind"]].append({"id": n, "label": d["label"],
                                       "recoverable": d.get("recoverable", None)})
-        order = {f"cls:{s}": i for i, s in enumerate(SIZE_ORDER)}
-        layers["class"].sort(key=lambda x: order.get(x["id"], 99))
+        layers["class"].sort(key=lambda x: class_sort_key(x["label"]))
         layers["element"].sort(key=lambda x: x["label"])
         layers["form"].sort(key=lambda x: (not x["recoverable"], x["label"]))
         edges = [{"src": u, "dst": v, "tonnes": d.get("tonnes", 0),

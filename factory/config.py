@@ -27,10 +27,15 @@ def load_env():
 load_env()
 
 # --- продукт ---
-DEFAULT_KPI = os.environ.get(
-    "FACTORY_KPI", "снизить потери извлекаемого металла с хвостами")
+# Намеренно НЕТ DEFAULT_KPI. Молчаливый дефолт на реальный бизнес-вопрос («что
+# оптимизируем») ввёл бы пользователя в заблуждение — лучше явная ошибка, чем тихая
+# подмена цели. KPI обязателен во всех CLI-командах (--kpi required) и в HypothesisFactory.
 OUTPUTS_DIR = os.environ.get("FACTORY_OUTPUTS", "outputs")
 DEFAULT_CACHE = os.path.join(OUTPUTS_DIR, "kb_cache.json")
+# конфиг ПОСЛЕДНЕГО запуска (KPI и параметры) — создаёт flex.py, читают benchmark/judge,
+# если им не передали свой --kpi. Не тайный дефолт: это переиспользование РЕАЛЬНОГО
+# значения из настоящего явного запуска, с объявлением источника в выводе (см. runconfig.py)
+RUN_CONFIG_PATH = os.path.join(OUTPUTS_DIR, "last_run.json")
 
 # --- LLM (Yandex AI Studio) ---
 YANDEX_BASE_URL = os.environ.get(
@@ -40,8 +45,13 @@ YANDEX_MODEL = os.environ.get("YANDEX_MODEL", "yandexgpt/latest")
 # --- извлечение из текста ---
 MAX_CHUNK_CHARS = int(os.environ.get("FACTORY_MAX_CHUNK_CHARS", "3500"))  # окно LLM
 MIN_PROSE_CHARS = int(os.environ.get("FACTORY_MIN_PROSE_CHARS", "200"))  # отсев огрызков
-LLM_WORKERS = int(os.environ.get("FACTORY_LLM_WORKERS", "4"))            # параллельные вызовы
-LLM_MAX_RETRIES = int(os.environ.get("FACTORY_LLM_RETRIES", "4"))        # backoff на 429/5xx
+# воркеров немного — при 4+ потоки одновременно ловят 429 и уходят в синхронный
+# backoff по одному и тому же расписанию (толпа бьётся в лимит хором)
+LLM_WORKERS = int(os.environ.get("FACTORY_LLM_WORKERS", "2"))            # параллельные вызовы
+LLM_MAX_RETRIES = int(os.environ.get("FACTORY_LLM_RETRIES", "5"))        # backoff на 429/5xx
+# после параллельного прохода фрагменты, упавшие даже после backoff внутри одного
+# запроса, добираются ещё раз ПОСЛЕДОВАТЕЛЬНО (не толпой) — см. extract.py
+FRAGMENT_RETRY_ATTEMPTS = int(os.environ.get("FACTORY_FRAGMENT_RETRIES", "2"))
 
 # --- LLM-as-judge (качественная метрика ветки Б) ---
 # по умолчанию — та же модель Yandex; в идеале судья ≠ генератору (см. judge.py),

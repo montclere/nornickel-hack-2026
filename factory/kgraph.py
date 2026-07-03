@@ -31,7 +31,9 @@ class KnowledgeGraph:
                 self.g.add_node(node, label=label.strip())
         self.g.add_edge(a, b, sign=r.get("sign", 0), relation=r.get("relation", "связан"),
                         quote=r.get("quote", ""), source=r.get("source", ""),
-                        locator=r.get("locator", ""), meta=r.get("meta", {}))
+                        locator=r.get("locator", ""), meta=r.get("meta", {}),
+                        is_action=bool(r.get("is_action", False)),
+                        role=r.get("role", "reference"))
 
     def stats(self):
         return {"nodes": self.g.number_of_nodes(), "edges": self.g.number_of_edges()}

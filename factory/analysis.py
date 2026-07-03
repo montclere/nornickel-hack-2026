@@ -5,22 +5,24 @@
   optimal_grind      — «обрыв раскрытия»: до какой крупности измельчать;
   tradeoffs          — противоречия (измельчение крупных ↔ рост -10 шламов);
   form_breakdown     — форм-специфичная разбивка потерь (что извлекаемо, что нет и почему).
+
+Всё считается по ЦЕЛЕВОМУ элементу (см. intent.py) — раньше было зашито «Ni».
 """
 from __future__ import annotations
 
-from factory.reader import LIBERATED, LOCKED, PRIMARY_ELEMENT, SIZE_ORDER
+from factory.reader import LIBERATED, LOCKED, PRIMARY_ELEMENT, class_sort_key
 from factory.rules import FORM_NOTES
 
 
-def _ni_forms(cl):
-    return [f for f in cl.forms if f.element == PRIMARY_ELEMENT and f.tonnes]
+def _target_forms(cl, element):
+    return [f for f in cl.forms if f.element == element and f.tonnes]
 
 
-def liberation_profile(profile):
-    """По классам крупности: доли раскрытого / закрытого / извлекаемого Ni."""
+def liberation_profile(profile, element):
+    """По классам крупности: доли раскрытого / закрытого / извлекаемого (по element)."""
     rows = []
     for cl in profile.classes:
-        forms = _ni_forms(cl)
+        forms = _target_forms(cl, element)
         tot = sum(f.tonnes for f in forms)
         if tot <= 0:
             continue
@@ -32,8 +34,8 @@ def liberation_profile(profile):
                      "locked_pct": round(100 * lock / tot, 1),
                      "recoverable_pct": round(100 * rec / tot, 1),
                      "rec_tonnes": round(rec, 1)})
-    # порядок крупности крупный→тонкий
-    rows.sort(key=lambda r: SIZE_ORDER.index(r["class"]) if r["class"] in SIZE_ORDER else 99)
+    # порядок крупности крупный→тонкий — без белого списка, по числу в подписи
+    rows.sort(key=lambda r: class_sort_key(r["class"]))
     return rows
 
 
@@ -49,7 +51,7 @@ def optimal_grind(lib_rows):
     return boundary
 
 
-def tradeoffs(profile, lib_rows):
+def tradeoffs(profile, lib_rows, element):
     """Противоречия между вмешательствами (данные это подтверждают)."""
     out = []
     by = {r["class"]: r for r in lib_rows}
@@ -58,17 +60,18 @@ def tradeoffs(profile, lib_rows):
     fines = by.get("-10")
     if coarse_locked and fines and fines["liberated_pct"] > 25:
         out.append(
-            "Измельчение крупных классов раскроет закрытый Pnt, НО увеличит долю -10 мкм, "
-            f"где уже {fines['liberated_pct']}% раскрытого Ni теряется со шламами. "
-            "Нужен баланс: доизмельчение крупного + отдельная схема улавливания -10.")
+            f"Измельчение крупных классов раскроет закрытый {element}-содержащий минерал, "
+            f"НО увеличит долю -10 мкм, где уже {fines['liberated_pct']}% раскрытого "
+            f"{element} теряется со шламами. Нужен баланс: доизмельчение крупного + "
+            f"отдельная схема улавливания -10.")
     return out
 
 
-def form_breakdown(profile):
-    """Суммарно по формам (все классы): тонны Ni, извлекаемость и причина потери."""
+def form_breakdown(profile, element):
+    """Суммарно по формам (все классы): тонны element, извлекаемость и причина потери."""
     agg = {}
     for cl in profile.classes:
-        for f in _ni_forms(cl):
+        for f in _target_forms(cl, element):
             a = agg.setdefault(f.form, {"tonnes": 0.0, "recoverable": f.recoverable})
             a["tonnes"] += f.tonnes
     total = sum(a["tonnes"] for a in agg.values()) or 1.0
@@ -81,7 +84,8 @@ def form_breakdown(profile):
     return rows
 
 
-def analyze(profile):
-    lib = liberation_profile(profile)
-    return {"liberation": lib, "optimal_grind": optimal_grind(lib),
-            "tradeoffs": tradeoffs(profile, lib), "forms": form_breakdown(profile)}
+def analyze(profile, element: str = PRIMARY_ELEMENT):
+    lib = liberation_profile(profile, element)
+    return {"element": element, "liberation": lib, "optimal_grind": optimal_grind(lib),
+            "tradeoffs": tradeoffs(profile, lib, element),
+            "forms": form_breakdown(profile, element)}
