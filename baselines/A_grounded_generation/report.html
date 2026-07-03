@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Фабрика гипотез</title>
+<style>
+:root{
+  --bg:#eef6fb; --card:#fff; --ink:#12303f; --muted:#5f7d8c;
+  --blue:#1f7ae0; --teal:#12b3ab; --teal-soft:#e6f7f5; --line:#e6eef3;
+  --radius:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  background:linear-gradient(180deg,#e7f3fa 0%,#eef6fb 100%);color:var(--ink);
+  line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:40px 22px 72px}
+header h1{margin:0;font-size:28px;font-weight:800;letter-spacing:-.4px}
+header h1 span{color:var(--teal)}
+header .sub{color:var(--muted);font-size:13.5px;margin-top:4px}
+.kpi{background:var(--teal-soft);border:1px solid #cdeeea;border-radius:var(--radius);
+  padding:14px 18px;margin:22px 0 10px;font-size:15px}
+.kpi b{color:var(--blue);font-weight:700}
+.src-line{color:var(--muted);font-size:12.5px;margin:0 2px 14px}
+.stats{display:flex;flex-wrap:wrap;gap:18px;margin:0 2px 20px;font-size:12.5px;color:var(--muted)}
+.stats b{color:var(--ink)}
+
+/* ── технический блок ── */
+.tech{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;margin:0 0 26px;box-shadow:0 1px 8px rgba(31,122,224,.05)}
+.tech-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+.tech-grid div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px}
+.tech-grid b{font-size:20px;font-weight:800;color:var(--blue);line-height:1.1}
+.tech-grid span{font-size:10.5px;color:var(--muted)}
+.tech-foot{text-align:center;color:var(--muted);font-size:12px;margin-top:14px;
+  padding-top:12px;border-top:1px solid var(--line)}
+.phases{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:10px}
+.tchip{background:var(--teal-soft);color:#0a7f79;font-size:11px;padding:4px 10px;border-radius:20px}
+
+/* ── карточка гипотезы ── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:22px 24px;margin:0 0 18px;box-shadow:0 2px 12px rgba(31,122,224,.06)}
+.chead{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.rank{font-size:17px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--blue),var(--teal));
+  width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center}
+.score{font-size:13px;font-weight:700;color:var(--blue);background:#eaf3fd;
+  padding:5px 12px;border-radius:20px}
+.badge{margin-left:auto;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px}
+.badge.ok{background:#e3f7ee;color:#0a8f54}
+.badge.warn{background:#fdeee9;color:#c0532a}
+
+.tri{margin:2px 0 18px}
+.tri .row{display:flex;gap:12px;align-items:baseline;margin:7px 0}
+.lab{flex:0 0 92px;text-align:right;font-size:10.5px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--teal);padding-top:2px}
+.lab.because{color:#9db3bf}
+.tri p{margin:0;font-size:15.5px;overflow-wrap:anywhere}
+.tri .muted{color:var(--muted);font-size:14px}
+
+.bars{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin:16px 0 14px}
+.bar-head{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+.bar-head b{color:var(--ink)}
+.bar{height:8px;background:#eaf1f5;border-radius:6px;margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--teal));
+  border-radius:6px}
+.pills{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.pill{background:#f5fafd;border:1px solid var(--line);border-radius:11px;padding:7px 14px;
+  display:flex;flex-direction:column;align-items:center;min-width:74px}
+.pill b{font-size:15px;font-weight:800;color:var(--ink)}
+.pill span{font-size:10.5px;color:var(--muted)}
+
+.exp{display:flex;gap:12px;align-items:baseline;background:#f6fbfd;border:1px solid var(--line);
+  border-radius:12px;padding:11px 14px;margin-bottom:14px}
+.exp .lab{flex:0 0 92px}
+.exp p{margin:0;font-size:13.5px;overflow-wrap:anywhere}
+
+.evidence{display:flex;flex-direction:column;gap:9px}
+.ev{display:flex;gap:11px;align-items:flex-start}
+.chip{flex:0 0 22px;height:22px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;font-weight:800;font-size:12px;color:#fff;margin-top:1px}
+.chip.p{background:var(--teal)} .chip.n{background:#e0895a} .chip.z{background:#9db3bf}
+.ev-b{flex:1;min-width:0}
+.ev-q{font-size:13px;color:#37505c;overflow-wrap:anywhere}
+.ev-s{font-size:11px;color:#9db3bf;margin-top:1px}
+.near{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px}
+.near span{color:#9db3bf;text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-right:6px}
+.near i{color:#37505c} .near em{color:#9db3bf;font-style:normal}
+
+footer{color:#9db3bf;font-size:12px;text-align:center;margin-top:30px;line-height:1.6}
+
+@media(max-width:600px){
+  .wrap{padding:26px 15px 48px}
+  .tech-grid{grid-template-columns:repeat(3,1fr);gap:16px 10px}
+  .bars{grid-template-columns:1fr}
+  .lab,.exp .lab{flex-basis:70px}
+}
+</style></head>
+<body><div class="wrap">
+  <header>
+    <h1>Фабрика <span>гипотез</span></h1>
+    <div class="sub">автоматический grounded-пайплайн · метрики считаются детерминированно</div>
+  </header>
+  <div class="kpi"><b>KPI</b> &nbsp;снизить потери никеля с хвостами флотации ТОФ</div>
+  <div class="src-line">материалы: materials</div>
+  <div class="stats"><span><b>30</b> связей в графе</span><span><b>51</b> отсеяно цитатным гейтом</span><span><b>8/8</b> заземлено</span></div>
+  
+    <section class="tech">
+      <div class="tech-grid"><div><b>227.2s</b><span>время всего</span></div><div><b>163.2s</b><span>из них API</span></div><div><b>21</b><span>вызовов LLM</span></div><div><b>39</b><span>эмбеддингов</span></div><div><b>41907</b><span>токенов LLM</span></div><div><b>894</b><span>токенов эмбед.</span></div></div>
+      <div class="tech-foot">
+        вход 33412 + выход 8495 токенов
+        · модель yandexgpt/latest
+      </div>
+      <div class="phases"><span class="tchip">знание (ingest+extract) · 177.7s</span><span class="tchip">генерация+оценка · 49.6s</span></div>
+    </section>
+  
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#1</div>
+        <div class="score">score 0.174</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>изменить pH среды в щелочную область для деактивации процесса флотации</p></div>
+        <div class="row"><span class="lab">то</span><p>снижение потерь никеля за счет оптимизации условий флотации</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">изменение pH среды в кислую область повышает деактивацию процесса флотации, что указывает на необходимость оптимизации pH для улучшения флотации</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.363</b></div>
+          <div class="bar"><i style="width:36%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.478</b></div>
+          <div class="bar"><i style="width:48%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.35</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>провести испытания с различным pH среды и оценить изменение содержания никеля в хвостах</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip p">＋</span>
+            <div class="ev-b">
+              <div class="ev-q">«Такая деактивация процесса происходит интенсивней при изменении pH среды в кислую область.»</div>
+              <div class="ev-s">flotaciya.pdf:стр.133</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>электрофлотация связан обогащение руд и очистка сточных вод</i> <em>flotaciya.pdf:стр.189</em></div>
+    </article>
+
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#2</div>
+        <div class="score">score 0.174</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>ввести ионогенные собиратели для снижения гидратированности минеральной поверхности</p></div>
+        <div class="row"><span class="lab">то</span><p>повышение флотируемости никеля за счет снижения гидратированности</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">ионогенные собиратели снижают гидратированность минеральной поверхности, что может улучшить флотируемость никеля</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.35</b></div>
+          <div class="bar"><i style="width:35%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.526</b></div>
+          <div class="bar"><i style="width:53%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.35</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>провести испытания с различными ионогенными собирателями и оценить изменение содержания никеля в концентрате</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip n">−</span>
+            <div class="ev-b">
+              <div class="ev-q">«может снизить гидратированность минеральной поверхности до такой степени, которая обеспечит растекание аполярного собирателя и прочное его закрепление на поверхности минерала»</div>
+              <div class="ev-s">flotaciya.pdf:стр.66</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>электрофлотация связан обогащение руд и очистка сточных вод</i> <em>flotaciya.pdf:стр.189</em></div>
+    </article>
+
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#3</div>
+        <div class="score">score 0.155</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>применить тонкое грохочение для класса -71 +45 мкм</p></div>
+        <div class="row"><span class="lab">то</span><p>снижение потерь никеля за счет более эффективного выделения силикатной формы/Валлериита</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">в классе -71 +45 мкм много силикатной формы/Валлериита, что указывает на возможность улучшения выделения этого класса</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.345</b></div>
+          <div class="bar"><i style="width:34%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.56</b></div>
+          <div class="bar"><i style="width:56%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.425</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>провести тонкое грохочение и оценить изменение содержания никеля в хвостах</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip z">≈</span>
+            <div class="ev-b">
+              <div class="ev-q">«Силикатная форма/Валлериит | 29.25155068811785 | 146.74093280950046 | 61.349999999999994 | 178.58528589532045»</div>
+              <div class="ev-s">Хвосты ТОФ_2.xlsx:Итог</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>класс -45 +20: в классе -45 +20 мкм много силикатной формы/Валлериита</i> <em>Хвосты ТОФ_2.xlsx:Итог</em></div>
+    </article>
+
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#4</div>
+        <div class="score">score 0.154</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>ввести дополнительное дозирование карбоксиметилцеллюлозы (КМЦ) для подавления минералов пустой породы</p></div>
+        <div class="row"><span class="lab">то</span><p>снижение потерь никеля за счет улучшения селективности флотации</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">КМЦ связана с подавлением минералов пустой породы, что может улучшить селективность флотации и снизить потери никеля</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.351</b></div>
+          <div class="bar"><i style="width:35%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.53</b></div>
+          <div class="bar"><i style="width:53%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.425</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>провести испытания с различным дозированием КМЦ и оценить изменение содержания никеля в хвостах</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip z">≈</span>
+            <div class="ev-b">
+              <div class="ev-q">«применение для подавления минералов пустой породы карбоксиметилцеллюлоза (КМЦ)»</div>
+              <div class="ev-s">flotaciya.pdf:стр.291</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>электрофлотация связан обогащение руд и очистка сточных вод</i> <em>flotaciya.pdf:стр.189</em></div>
+    </article>
+
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#5</div>
+        <div class="score">score 0.128</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>оптимизировать время флотации для класса -20 +10 мкм</p></div>
+        <div class="row"><span class="lab">то</span><p>повышение извлечения никеля за счет более полного флотирования раскрытого Pnt/Cp</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">в классе -20 +10 мкм много раскрытого Pnt/Cp, что требует оптимизации времени флотации для повышения извлечения</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.29</b></div>
+          <div class="bar"><i style="width:29%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.535</b></div>
+          <div class="bar"><i style="width:54%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.425</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>провести испытания с различным временем флотации и оценить изменение содержания никеля в концентрате</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip z">≈</span>
+            <div class="ev-b">
+              <div class="ev-q">«Раскрытый Pnt/Cp | 31.348464685470077 | 46.669288308814885 | 36.39964795 | 53.36354054830299»</div>
+              <div class="ev-s">Хвосты ТОФ_2.xlsx:Итог</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>класс -20 +10: в классе -20 +10 мкм много раскрытого Pnt/Cp</i> <em>Хвосты НОФ Вкр.xlsx:Итог</em></div>
+    </article>
+
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#6</div>
+        <div class="score">score 0.127</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>использовать гидроциклоны для классификации хвостов флотации</p></div>
+        <div class="row"><span class="lab">то</span><p>перераспределение целевого класса -45 +20 мкм с высоким содержанием силикатной формы/Валлериита</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">в классе -45 +20 мкм много силикатной формы/Валлериита, что может быть эффективно перераспределено с помощью гидроциклонов</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.283</b></div>
+          <div class="bar"><i style="width:28%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.555</b></div>
+          <div class="bar"><i style="width:56%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.425</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>протестировать различные настройки гидроциклонов и оценить изменение содержания никеля в хвостах</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip z">≈</span>
+            <div class="ev-b">
+              <div class="ev-q">«Силикатная форма/Валлериит | 34.490644849489094 | 117.78257989956984 | 55.543499999999995 | 135.6829501388095»</div>
+              <div class="ev-s">Хвосты ТОФ_2.xlsx:Итог</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>класс -71 +45: в классе -71 +45 мкм много силикатной формы/Валлериита</i> <em>Хвосты ТОФ_2.xlsx:Итог</em></div>
+    </article>
+
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#7</div>
+        <div class="score">score 0.123</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>внедрить доизмельчение для класса -125 +71 мкм</p></div>
+        <div class="row"><span class="lab">то</span><p>повышение флотируемости Pnt/Cp за счет увеличения раскрытия</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">в классе -125 +71 мкм много закрытого Pnt/Cp, что свидетельствует о недостаточном измельчении</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.285</b></div>
+          <div class="bar"><i style="width:28%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.496</b></div>
+          <div class="bar"><i style="width:50%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.425</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>провести доизмельчение и оценить изменение флотируемости Pnt/Cp в этом классе</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip z">≈</span>
+            <div class="ev-b">
+              <div class="ev-q">«Закрытый Pnt/Cp | 54.714315622837155 | 788.1632724047378 | 11.608082500000004 | 84.82630584204642»</div>
+              <div class="ev-s">Хвосты ТОФ_2.xlsx:Итог</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>класс -125 +71: в классе -125 +71 мкм много закрытого Pnt/Cp</i> <em>Хвосты НОФ Вкр.xlsx:Итог</em></div>
+    </article>
+
+    <article class="card">
+      <div class="chead">
+        <div class="rank">#8</div>
+        <div class="score">score 0.114</div>
+        <span class="badge ok">grounded</span>
+      </div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>изменить геометрию футеровки мельниц для более эффективного измельчения</p></div>
+        <div class="row"><span class="lab">то</span><p>увеличение раскрытия Pnt/Cp в классе +125 мкм</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">в классе +125 мкм много закрытого Pnt/Cp, что указывает на необходимость более тонкого измельчения для повышения флотируемости</p></div>
+      </div>
+
+      <div class="bars">
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>relevance — близость к KPI</span><b>0.251</b></div>
+          <div class="bar"><i style="width:25%"></i></div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-head"><span>novelty — новизна</span><b>0.577</b></div>
+          <div class="bar"><i style="width:58%"></i></div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill"><b>1</b><span>источников</span></div>
+        <div class="pill"><b>0.425</b><span>risk</span></div>
+        <div class="pill"><b>1</b><span>фактов</span></div>
+      </div>
+
+      <div class="exp"><span class="lab">эксперимент</span>
+        <p>провести испытания с различными типами футеровки и сравнить результаты по степени раскрытия Pnt/Cp</p></div>
+
+      <div class="evidence">
+          <div class="ev">
+            <span class="chip z">≈</span>
+            <div class="ev-b">
+              <div class="ev-q">«Закрытый Pnt/Cp | 66.9275884388023 | 663.3980114484424 | 31.168430999999998 | 410.8478075439113»</div>
+              <div class="ev-s">Хвосты ТОФ_2.xlsx:Итог</div>
+            </div>
+          </div></div>
+      <div class="near"><span>ближайшее известное</span> <i>класс -45 +20: в классе -45 +20 мкм много закрытого Pnt/Cp</i> <em>Хвосты НОФ Вкр.xlsx:Итог</em></div>
+    </article>
+  <footer>Каждая гипотеза заземлена цитатой до источника<br>
+    новизна = расстояние до ближайшего известного решения</footer>
+</div>
+<script id="data" type="application/json">[{&quot;if&quot;: &quot;изменить pH среды в щелочную область для деактивации процесса флотации&quot;, &quot;then&quot;: &quot;снижение потерь никеля за счет оптимизации условий флотации&quot;, &quot;because&quot;: &quot;изменение pH среды в кислую область повышает деактивацию процесса флотации, что указывает на необходимость оптимизации pH для улучшения флотации&quot;, &quot;experiment&quot;: &quot;провести испытания с различным pH среды и оценить изменение содержания никеля в хвостах&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;изменение pH среды в кислую область&quot;, &quot;relation&quot;: &quot;повышает&quot;, &quot;sign&quot;: 1, &quot;object&quot;: &quot;деактивация процесса флотации&quot;, &quot;quote&quot;: &quot;Такая деактивация процесса происходит интенсивней при изменении pH среды в кислую область.&quot;, &quot;source&quot;: &quot;flotaciya.pdf&quot;, &quot;locator&quot;: &quot;flotaciya.pdf:стр.133&quot;, &quot;id&quot;: &quot;k12&quot;, &quot;text&quot;: &quot;изменение pH среды в кислую область повышает деактивация процесса флотации&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.363, &quot;novelty&quot;: 0.478, &quot;support&quot;: 1, &quot;signs&quot;: [1], &quot;sign_risk&quot;: 0.2, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.35, &quot;score&quot;: 0.174, &quot;nearest&quot;: {&quot;subject&quot;: &quot;электрофлотация&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;обогащение руд и очистка сточных вод&quot;, &quot;quote&quot;: &quot;этот процесс начали применять для обогащения ряда тонковкрапленных руд и особенно для очистки сточных вод&quot;, &quot;source&quot;: &quot;flotaciya.pdf&quot;, &quot;locator&quot;: &quot;flotaciya.pdf:стр.189&quot;, &quot;id&quot;: &quot;k6&quot;, &quot;text&quot;: &quot;электрофлотация связан обогащение руд и очистка сточных вод&quot;}}}, {&quot;if&quot;: &quot;ввести ионогенные собиратели для снижения гидратированности минеральной поверхности&quot;, &quot;then&quot;: &quot;повышение флотируемости никеля за счет снижения гидратированности&quot;, &quot;because&quot;: &quot;ионогенные собиратели снижают гидратированность минеральной поверхности, что может улучшить флотируемость никеля&quot;, &quot;experiment&quot;: &quot;провести испытания с различными ионогенными собирателями и оценить изменение содержания никеля в концентрате&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;ионогенные собиратели&quot;, &quot;relation&quot;: &quot;снижает&quot;, &quot;sign&quot;: -1, &quot;object&quot;: &quot;гидратированность минеральной поверхности&quot;, &quot;quote&quot;: &quot;может снизить гидратированность минеральной поверхности до такой степени, которая обеспечит растекание аполярного собирателя и прочное его закрепление на поверхности минерала&quot;, &quot;source&quot;: &quot;flotaciya.pdf&quot;, &quot;locator&quot;: &quot;flotaciya.pdf:стр.66&quot;, &quot;id&quot;: &quot;k1&quot;, &quot;text&quot;: &quot;ионогенные собиратели снижает гидратированность минеральной поверхности&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.35, &quot;novelty&quot;: 0.526, &quot;support&quot;: 1, &quot;signs&quot;: [-1], &quot;sign_risk&quot;: 0.2, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.35, &quot;score&quot;: 0.174, &quot;nearest&quot;: {&quot;subject&quot;: &quot;электрофлотация&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;обогащение руд и очистка сточных вод&quot;, &quot;quote&quot;: &quot;этот процесс начали применять для обогащения ряда тонковкрапленных руд и особенно для очистки сточных вод&quot;, &quot;source&quot;: &quot;flotaciya.pdf&quot;, &quot;locator&quot;: &quot;flotaciya.pdf:стр.189&quot;, &quot;id&quot;: &quot;k6&quot;, &quot;text&quot;: &quot;электрофлотация связан обогащение руд и очистка сточных вод&quot;}}}, {&quot;if&quot;: &quot;применить тонкое грохочение для класса -71 +45 мкм&quot;, &quot;then&quot;: &quot;снижение потерь никеля за счет более эффективного выделения силикатной формы/Валлериита&quot;, &quot;because&quot;: &quot;в классе -71 +45 мкм много силикатной формы/Валлериита, что указывает на возможность улучшения выделения этого класса&quot;, &quot;experiment&quot;: &quot;провести тонкое грохочение и оценить изменение содержания никеля в хвостах&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;потери извлекаемого металла в классе -71 +45&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -71 +45 мкм много силикатной формы/Валлериита&quot;, &quot;quote&quot;: &quot;Силикатная форма/Валлериит | 29.25155068811785 | 146.74093280950046 | 61.349999999999994 | 178.58528589532045&quot;, &quot;source&quot;: &quot;Хвосты ТОФ_2.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты ТОФ_2.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -71 +45 мкм много силикатной формы/Валлериита&quot;, &quot;size_class&quot;: &quot;-71 +45&quot;, &quot;id&quot;: &quot;k28&quot;, &quot;text&quot;: &quot;класс -71 +45: в классе -71 +45 мкм много силикатной формы/Валлериита&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.345, &quot;novelty&quot;: 0.56, &quot;support&quot;: 1, &quot;signs&quot;: [0], &quot;sign_risk&quot;: 0.35, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.425, &quot;score&quot;: 0.155, &quot;nearest&quot;: {&quot;subject&quot;: &quot;потери извлекаемого металла в классе -45 +20&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -45 +20 мкм много силикатной формы/Валлериита&quot;, &quot;quote&quot;: &quot;Силикатная форма/Валлериит | 34.490644849489094 | 117.78257989956984 | 55.543499999999995 | 135.6829501388095&quot;, &quot;source&quot;: &quot;Хвосты ТОФ_2.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты ТОФ_2.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -45 +20 мкм много силикатной формы/Валлериита&quot;, &quot;size_class&quot;: &quot;-45 +20&quot;, &quot;id&quot;: &quot;k29&quot;, &quot;text&quot;: &quot;класс -45 +20: в классе -45 +20 мкм много силикатной формы/Валлериита&quot;}}}, {&quot;if&quot;: &quot;ввести дополнительное дозирование карбоксиметилцеллюлозы (КМЦ) для подавления минералов пустой породы&quot;, &quot;then&quot;: &quot;снижение потерь никеля за счет улучшения селективности флотации&quot;, &quot;because&quot;: &quot;КМЦ связана с подавлением минералов пустой породы, что может улучшить селективность флотации и снизить потери никеля&quot;, &quot;experiment&quot;: &quot;провести испытания с различным дозированием КМЦ и оценить изменение содержания никеля в хвостах&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;карбоксиметилцеллюлоза (КМЦ)&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;подавление минералов пустой породы&quot;, &quot;quote&quot;: &quot;применение для подавления минералов пустой породы карбоксиметилцеллюлоза (КМЦ)&quot;, &quot;source&quot;: &quot;flotaciya.pdf&quot;, &quot;locator&quot;: &quot;flotaciya.pdf:стр.291&quot;, &quot;id&quot;: &quot;k7&quot;, &quot;text&quot;: &quot;карбоксиметилцеллюлоза (КМЦ) связан подавление минералов пустой породы&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.351, &quot;novelty&quot;: 0.53, &quot;support&quot;: 1, &quot;signs&quot;: [0], &quot;sign_risk&quot;: 0.35, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.425, &quot;score&quot;: 0.154, &quot;nearest&quot;: {&quot;subject&quot;: &quot;электрофлотация&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;обогащение руд и очистка сточных вод&quot;, &quot;quote&quot;: &quot;этот процесс начали применять для обогащения ряда тонковкрапленных руд и особенно для очистки сточных вод&quot;, &quot;source&quot;: &quot;flotaciya.pdf&quot;, &quot;locator&quot;: &quot;flotaciya.pdf:стр.189&quot;, &quot;id&quot;: &quot;k6&quot;, &quot;text&quot;: &quot;электрофлотация связан обогащение руд и очистка сточных вод&quot;}}}, {&quot;if&quot;: &quot;оптимизировать время флотации для класса -20 +10 мкм&quot;, &quot;then&quot;: &quot;повышение извлечения никеля за счет более полного флотирования раскрытого Pnt/Cp&quot;, &quot;because&quot;: &quot;в классе -20 +10 мкм много раскрытого Pnt/Cp, что требует оптимизации времени флотации для повышения извлечения&quot;, &quot;experiment&quot;: &quot;провести испытания с различным временем флотации и оценить изменение содержания никеля в концентрате&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;потери извлекаемого металла в классе -20 +10&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -20 +10 мкм много раскрытого Pnt/Cp&quot;, &quot;quote&quot;: &quot;Раскрытый Pnt/Cp | 31.348464685470077 | 46.669288308814885 | 36.39964795 | 53.36354054830299&quot;, &quot;source&quot;: &quot;Хвосты ТОФ_2.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты ТОФ_2.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -20 +10 мкм много раскрытого Pnt/Cp&quot;, &quot;size_class&quot;: &quot;-20 +10&quot;, &quot;id&quot;: &quot;k30&quot;, &quot;text&quot;: &quot;класс -20 +10: в классе -20 +10 мкм много раскрытого Pnt/Cp&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.29, &quot;novelty&quot;: 0.535, &quot;support&quot;: 1, &quot;signs&quot;: [0], &quot;sign_risk&quot;: 0.35, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.425, &quot;score&quot;: 0.128, &quot;nearest&quot;: {&quot;subject&quot;: &quot;потери извлекаемого металла в классе -20 +10&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -20 +10 мкм много раскрытого Pnt/Cp&quot;, &quot;quote&quot;: &quot;Раскрытый Pnt/Cp | 6.812715304790509 | 17.15277898494534 | 83.46015972747358 | 27.64902812738201&quot;, &quot;source&quot;: &quot;Хвосты НОФ Вкр.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты НОФ Вкр.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -20 +10 мкм много раскрытого Pnt/Cp&quot;, &quot;size_class&quot;: &quot;-20 +10&quot;, &quot;id&quot;: &quot;k21&quot;, &quot;text&quot;: &quot;класс -20 +10: в классе -20 +10 мкм много раскрытого Pnt/Cp&quot;}}}, {&quot;if&quot;: &quot;использовать гидроциклоны для классификации хвостов флотации&quot;, &quot;then&quot;: &quot;перераспределение целевого класса -45 +20 мкм с высоким содержанием силикатной формы/Валлериита&quot;, &quot;because&quot;: &quot;в классе -45 +20 мкм много силикатной формы/Валлериита, что может быть эффективно перераспределено с помощью гидроциклонов&quot;, &quot;experiment&quot;: &quot;протестировать различные настройки гидроциклонов и оценить изменение содержания никеля в хвостах&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;потери извлекаемого металла в классе -45 +20&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -45 +20 мкм много силикатной формы/Валлериита&quot;, &quot;quote&quot;: &quot;Силикатная форма/Валлериит | 34.490644849489094 | 117.78257989956984 | 55.543499999999995 | 135.6829501388095&quot;, &quot;source&quot;: &quot;Хвосты ТОФ_2.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты ТОФ_2.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -45 +20 мкм много силикатной формы/Валлериита&quot;, &quot;size_class&quot;: &quot;-45 +20&quot;, &quot;id&quot;: &quot;k29&quot;, &quot;text&quot;: &quot;класс -45 +20: в классе -45 +20 мкм много силикатной формы/Валлериита&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.283, &quot;novelty&quot;: 0.555, &quot;support&quot;: 1, &quot;signs&quot;: [0], &quot;sign_risk&quot;: 0.35, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.425, &quot;score&quot;: 0.127, &quot;nearest&quot;: {&quot;subject&quot;: &quot;потери извлекаемого металла в классе -71 +45&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -71 +45 мкм много силикатной формы/Валлериита&quot;, &quot;quote&quot;: &quot;Силикатная форма/Валлериит | 29.25155068811785 | 146.74093280950046 | 61.349999999999994 | 178.58528589532045&quot;, &quot;source&quot;: &quot;Хвосты ТОФ_2.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты ТОФ_2.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -71 +45 мкм много силикатной формы/Валлериита&quot;, &quot;size_class&quot;: &quot;-71 +45&quot;, &quot;id&quot;: &quot;k28&quot;, &quot;text&quot;: &quot;класс -71 +45: в классе -71 +45 мкм много силикатной формы/Валлериита&quot;}}}, {&quot;if&quot;: &quot;внедрить доизмельчение для класса -125 +71 мкм&quot;, &quot;then&quot;: &quot;повышение флотируемости Pnt/Cp за счет увеличения раскрытия&quot;, &quot;because&quot;: &quot;в классе -125 +71 мкм много закрытого Pnt/Cp, что свидетельствует о недостаточном измельчении&quot;, &quot;experiment&quot;: &quot;провести доизмельчение и оценить изменение флотируемости Pnt/Cp в этом классе&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;потери извлекаемого металла в классе -125 +71&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -125 +71 мкм много закрытого Pnt/Cp&quot;, &quot;quote&quot;: &quot;Закрытый Pnt/Cp | 54.714315622837155 | 788.1632724047378 | 11.608082500000004 | 84.82630584204642&quot;, &quot;source&quot;: &quot;Хвосты ТОФ_2.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты ТОФ_2.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -125 +71 мкм много закрытого Pnt/Cp&quot;, &quot;size_class&quot;: &quot;-125 +71&quot;, &quot;id&quot;: &quot;k27&quot;, &quot;text&quot;: &quot;класс -125 +71: в классе -125 +71 мкм много закрытого Pnt/Cp&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.285, &quot;novelty&quot;: 0.496, &quot;support&quot;: 1, &quot;signs&quot;: [0], &quot;sign_risk&quot;: 0.35, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.425, &quot;score&quot;: 0.123, &quot;nearest&quot;: {&quot;subject&quot;: &quot;потери извлекаемого металла в классе -125 +71&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -125 +71 мкм много закрытого Pnt/Cp&quot;, &quot;quote&quot;: &quot;Закрытый Pnt/Cp | 44.21363897407734 | 260.6385244393351 | 93.07270034432949 | 73.60096267068653&quot;, &quot;source&quot;: &quot;Хвосты НОФ Вкр.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты НОФ Вкр.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -125 +71 мкм много закрытого Pnt/Cp&quot;, &quot;size_class&quot;: &quot;-125 +71&quot;, &quot;id&quot;: &quot;k18&quot;, &quot;text&quot;: &quot;класс -125 +71: в классе -125 +71 мкм много закрытого Pnt/Cp&quot;}}}, {&quot;if&quot;: &quot;изменить геометрию футеровки мельниц для более эффективного измельчения&quot;, &quot;then&quot;: &quot;увеличение раскрытия Pnt/Cp в классе +125 мкм&quot;, &quot;because&quot;: &quot;в классе +125 мкм много закрытого Pnt/Cp, что указывает на необходимость более тонкого измельчения для повышения флотируемости&quot;, &quot;experiment&quot;: &quot;провести испытания с различными типами футеровки и сравнить результаты по степени раскрытия Pnt/Cp&quot;, &quot;grounded&quot;: true, &quot;facts&quot;: [{&quot;subject&quot;: &quot;потери извлекаемого металла в классе +125&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе +125 мкм много закрытого Pnt/Cp&quot;, &quot;quote&quot;: &quot;Закрытый Pnt/Cp | 66.9275884388023 | 663.3980114484424 | 31.168430999999998 | 410.8478075439113&quot;, &quot;source&quot;: &quot;Хвосты ТОФ_2.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты ТОФ_2.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе +125 мкм много закрытого Pnt/Cp&quot;, &quot;size_class&quot;: &quot;+125&quot;, &quot;id&quot;: &quot;k26&quot;, &quot;text&quot;: &quot;класс +125: в классе +125 мкм много закрытого Pnt/Cp&quot;}], &quot;metrics&quot;: {&quot;relevance&quot;: 0.251, &quot;novelty&quot;: 0.577, &quot;support&quot;: 1, &quot;signs&quot;: [0], &quot;sign_risk&quot;: 0.35, &quot;support_risk&quot;: 0.5, &quot;risk&quot;: 0.425, &quot;score&quot;: 0.114, &quot;nearest&quot;: {&quot;subject&quot;: &quot;потери извлекаемого металла в классе -45 +20&quot;, &quot;relation&quot;: &quot;связан&quot;, &quot;sign&quot;: 0, &quot;object&quot;: &quot;в классе -45 +20 мкм много закрытого Pnt/Cp&quot;, &quot;quote&quot;: &quot;Закрытый Pnt/Cp | 37.878962839971024 | 149.84773580086204 | 20.469529495531887 | 9.52666822035548&quot;, &quot;source&quot;: &quot;Хвосты НОФ Вкр.xlsx&quot;, &quot;locator&quot;: &quot;Хвосты НОФ Вкр.xlsx:Итог&quot;, &quot;kind&quot;: &quot;data&quot;, &quot;finding&quot;: &quot;в классе -45 +20 мкм много закрытого Pnt/Cp&quot;, &quot;size_class&quot;: &quot;-45 +20&quot;, &quot;id&quot;: &quot;k20&quot;, &quot;text&quot;: &quot;класс -45 +20: в классе -45 +20 мкм много закрытого Pnt/Cp&quot;}}}]</script>
+</body></html>

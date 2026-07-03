@@ -1,51 +1,9 @@
-# --- Python ---
-__pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-build/
-dist/
+*.zip
+*.pdf
+*.docx
+*.xlsx
 
-# --- виртуальные окружения ---
-.venv/
-venv/
-env/
-.python-version
-
-# --- тесты / линтеры ---
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# --- генерируемые артефакты (воспроизводятся скриптами) ---
-# корпус/отчёты/сканы — python scripts/build_corpus.py
-data/*
-!data/.gitkeep
-# БД/выгрузки рантайма
-outputs/*
-!outputs/.gitkeep
-
-# --- фронтенд (Node) ---
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-node_modules/
-
-# --- секреты / окружение ---
-.env
-.env.*
-!.env.example
-
-# --- IDE / редакторы ---
-.vscode/
-.idea/
-*.swp
-
-# --- OS ---
-.DS_Store
-Thumbs.db
-
-# --- внутренние материалы (не для публичного репозитория) ---
-/docs
+*.zip
+*.pdf
+*.docx
+*.xlsx
