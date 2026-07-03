@@ -76,6 +76,18 @@ def _tokens(s):
     return set(re.findall(r"[а-яёa-z]{4,}", (s or "").lower()))
 
 
+def _quote_ok(q, nt, fuzzy):
+    """Цитата в тексте? Для OCR-чанков — мягко (≥80% слов), т.к. распознавание шумит."""
+    if q in nt:
+        return True
+    if not fuzzy:
+        return False
+    toks = re.findall(r"[а-яёa-z0-9]{3,}", q)
+    if len(toks) < 3:
+        return False
+    return sum(1 for w in toks if w in nt) / len(toks) >= 0.8
+
+
 def _select(chunks, max_chunks, query):
     prose = [c for c in chunks if c.kind == "prose" and len(c.text) >= MIN_PROSE_CHARS
              and sum(ch.isalpha() for ch in c.text) / max(len(c.text), 1) >= 0.55]
@@ -147,11 +159,12 @@ def _process_triples(c, triples):
     if not isinstance(triples, list):
         return [], 0, 0
     nt = _norm(c.text)
+    ocr = bool((c.meta or {}).get("ocr"))       # OCR-чанк → мягкий цитатный гейт (шум распознавания)
     out = []
     for t in triples:
         q = _norm(t.get("quote", "")); rel = _canon_rel(t.get("relation", ""))
         subj, obj = t.get("subject", ""), t.get("object", "")
-        if not (subj and obj) or rel is None or len(q) < 8 or q not in nt:
+        if not (subj and obj) or rel is None or len(q) < 8 or not _quote_ok(q, nt, ocr):
             continue
         out.append({"subject": subj.strip(), "relation": rel, "sign": RELATION_VOCAB[rel],
                     "object": obj.strip(), "quote": t.get("quote", "").strip(),

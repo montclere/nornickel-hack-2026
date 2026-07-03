@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """Универсальный приём разнородных материалов → фрагменты с провенансом.
 
-Человек кладёт ЧТО УГОДНО (PDF/DOCX/TXT/XLSX/CSV) — здесь всё автоматически
+Человек кладёт ЧТО УГОДНО (PDF/DOCX/TXT/XLSX/CSV/картинки) — здесь всё автоматически
 разбирается в единый список Chunk. Структуру НЕ хардкодим: текст идёт как текст,
-таблицы — как строки с координатами. Дальнейшее извлечение сущностей — в extract.py.
+таблицы — как строки с координатами, картинки/сканы → текст через OCR (см. ocr.py).
+Дальнейшее извлечение сущностей — в extract.py.
 
 Chunk = {text, source, locator, kind: 'prose'|'table', role, meta}. meta несёт
-доступные метаданные (файл, страница/лист, дата файла).
+доступные метаданные (файл, страница/лист, дата файла, ocr).
 
 role — «состояние» (факты про КОНКРЕТНУЮ фабрику: измерения, отчёты, схемы этого
 объекта) vs «справочное» (теория, best practices, методички — общее знание домена,
@@ -26,7 +27,13 @@ import re
 import zipfile
 from dataclasses import dataclass, field
 
-from factory.config import MAX_CHUNK_CHARS
+from factory.config import MAX_CHUNK_CHARS, OCR_DPI, OCR_ENABLED, OCR_MIN_CHARS, OCR_PDF_MAX_PAGES
+
+# картинки, которые распознаём через OCR (mime для Yandex Vision)
+IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+              ".tif": "image/tiff", ".tiff": "image/tiff", ".bmp": "image/bmp",
+              ".webp": "image/webp"}
+IMAGE_EXTS = set(IMAGE_MIME)
 
 _STATE_DIR_HINTS = {"state", "fabrics", "фабрики", "состояние", "объект", "объекты"}
 _REFERENCE_DIR_HINTS = {"reference", "справочники", "методички", "литература", "reference_materials"}
@@ -51,8 +58,22 @@ class Chunk:
     meta: dict = field(default_factory=dict)
 
 
-def ingest(paths) -> list:
-    """paths — файл, папка или список. Возвращает список Chunk по всем поддерж. файлам."""
+def _default_ocr():
+    """OCR-клиент Yandex, если включён и готов; иначе None (картинки → needs_ocr)."""
+    if not OCR_ENABLED:
+        return None
+    try:
+        from factory.ocr import YandexOCR
+        o = YandexOCR()
+        return o if o.ready else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def ingest(paths, ocr="auto") -> list:
+    """paths — файл, папка или список. Возвращает список Chunk по всем поддерж. файлам.
+
+    ocr: "auto" — поднять Yandex OCR, если доступен; None — без OCR; или готовый клиент."""
     if isinstance(paths, str):
         paths = [paths]
     files = []
@@ -61,21 +82,25 @@ def ingest(paths) -> list:
             files += glob.glob(os.path.join(p, "**", "*"), recursive=True)
         else:
             files.append(p)
+    if ocr == "auto":
+        ocr = _default_ocr()
     out = []
     for f in sorted(set(files)):
         if os.path.isfile(f):
-            out += ingest_file(f)
+            out += ingest_file(f, ocr)
     return out
 
 
-def ingest_file(path: str) -> list:
+def ingest_file(path: str, ocr=None) -> list:
     ext = os.path.splitext(path)[1].lower()
     name = os.path.basename(path)
     meta = {"file": name, "mtime": _mtime(path)}
     role = _infer_role(path)
     try:
         if ext == ".pdf":
-            return _pdf(path, name, meta, role)
+            return _pdf(path, name, meta, role, ocr)
+        if ext in IMAGE_EXTS:
+            return _image(path, name, meta, role, ocr)
         if ext == ".docx":
             return _docx(path, name, meta, role)
         if ext in (".txt", ".md"):
@@ -98,18 +123,40 @@ def _mtime(path):
         return None
 
 
-def _pdf(path, name, meta, role):
+def _pdf(path, name, meta, role, ocr=None):
     import fitz
     doc = fitz.open(path)
-    out = []
+    out, ocr_pages = [], 0
     for i in range(doc.page_count):
-        t = doc[i].get_text().strip()
+        page = doc[i]
+        t = page.get_text().strip()
         if len(t) >= 40:
             out.append(Chunk(t, name, f"{name}:стр.{i+1}", "prose", role,
                              {**meta, "page": i + 1}))
+        elif ocr is not None and ocr.ready and ocr_pages < OCR_PDF_MAX_PAGES:
+            # страница без текстового слоя (скан) → растеризуем и распознаём
+            ocr_pages += 1
+            try:
+                ot = ocr.recognize(page.get_pixmap(dpi=OCR_DPI).tobytes("png"), "image/png")
+            except Exception:  # noqa: BLE001
+                ot = ""
+            if len(ot.strip()) >= OCR_MIN_CHARS:
+                out.append(Chunk(ot, name, f"{name}:стр.{i+1}", "prose", role,
+                                 {**meta, "page": i + 1, "ocr": True}))
     if not out:
         out.append(Chunk("", name, name, "prose", role, {**meta, "needs_ocr": True}))
     return out
+
+
+def _image(path, name, meta, role, ocr=None):
+    """Картинка (скан регламента, схема флотации) → текст через Yandex Vision OCR."""
+    meta = {**meta, "ocr": True}
+    if ocr is None or not ocr.ready:
+        return [Chunk("", name, name, "prose", role, {**meta, "needs_ocr": True})]
+    mime = IMAGE_MIME.get(os.path.splitext(path)[1].lower(), "image/png")
+    text = ocr.recognize(open(path, "rb").read(), mime)
+    tail = {} if len(text.strip()) >= OCR_MIN_CHARS else {"needs_ocr": True}
+    return [Chunk(text, name, name, "prose", role, {**meta, **tail})]
 
 
 def _docx(path, name, meta, role):
