@@ -1,7 +1,0 @@
-{
-  "id": "Ni_recovery",
-  "label": "Извлечение Ni",
-  "type": "KPI",
-  "aliases": ["nickel recovery", "извлечение никеля", "Ni recovery"],
-  "closure_reason": null
-}

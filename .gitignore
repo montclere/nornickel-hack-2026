@@ -1,9 +1,22 @@
-*.zip
-*.pdf
-*.docx
-*.xlsx
+# окружение / python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
 
+# секреты
+.env
+
+# локальные тестовые материалы и данные кейса (в git не храним)
+materials/
 *.zip
 *.pdf
 *.docx
 *.xlsx
+*.png
+
+# сгенерированные отчёты
+*.html
+
+# сгенерированные отчёты
+outputs/

@@ -1,9 +1,0 @@
-{
-  "source": "pH",
-  "target": "Ni_recovery",
-  "sign": "+",
-  "conditions": {"ore": "pentlandite"},
-  "doc_id": "report_2009",
-  "evidence_quote": "Повышение pH пульпы увеличивает извлечение Ni на рудах пентландита.",
-  "year": 2009
-}
