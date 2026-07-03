@@ -10,13 +10,17 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 
+@lru_cache(maxsize=None)
 def _tokens(s):
-    return set(re.findall(r"[а-яёa-z]{4,}", (s or "").lower()))
+    return frozenset(re.findall(r"[а-яёa-z]{4,}", (s or "").lower()))
 
 
+@lru_cache(maxsize=None)
 def _sim(a, b):
+    """Похожесть узлов по токенам. Кэшируется: find_gaps сравнивает пары O(E²) раз."""
     ta, tb = _tokens(a), _tokens(b)
     return len(ta & tb) / min(len(ta), len(tb)) if ta and tb else 0.0
 

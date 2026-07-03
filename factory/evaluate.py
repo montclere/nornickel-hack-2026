@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import html
+import os
 import re
 import sys
 import zipfile
@@ -59,7 +60,7 @@ def main():
     gfams = [family_of(g) for g in golden]
 
     print("=" * 74)
-    print(f"ОЦЕНКА против эталона · {golden_path.split('/')[-1]}")
+    print(f"ОЦЕНКА против эталона · {os.path.basename(golden_path)}")
     print("=" * 74)
     print(f"наши семейства вмешательств: {sorted(our_fams)}\n")
     hit = 0

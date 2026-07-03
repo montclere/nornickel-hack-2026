@@ -6,13 +6,17 @@
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 # --- доменные константы (из инструкции «Как читать отчёт института по хвостам») ---
 ELEMENTS = {"Элемент 28": "Ni", "Элемент 29": "Cu"}
+ELEMENT_SYMBOLS = tuple(ELEMENTS.values())      # порядок: ведущий элемент первым
+PRIMARY_ELEMENT = ELEMENT_SYMBOLS[0]            # по нему — доминирующие формы/раскрытие
 # потенциально извлекаемые текущей технологией минеральные формы
 RECOVERABLE = {
     "Ni": {"Раскрытый Pnt/Cp", "Закрытый Pnt/Cp", "Миллерит"},
@@ -21,6 +25,10 @@ RECOVERABLE = {
 LIBERATED = "Раскрытый Pnt/Cp"   # раскрытый минерал
 LOCKED = "Закрытый Pnt/Cp"       # заперт в сростках
 SIZE_ORDER = ["+125", "-125+71", "-71+45", "-45+20", "-20+10", "-10"]
+# раскладка по умолчанию (если детект по шапке не сработал): {элемент: (кол.%, кол.т)}
+# C=доля класса, D=%Ni, E=т Ni, F=%Cu, G=т Cu
+DEFAULT_ELEMENT_COLUMNS = {"Ni": (4, 5), "Cu": (6, 7)}
+ANCHOR_COL = 2                   # колонка B — подписи-якоря («Класс крупности», формы)
 
 
 def _num(v):
@@ -81,31 +89,50 @@ class TailingsReader:
 
     def __init__(self, path: str):
         self.path = path
-        self.fabric = re.sub(r"Хвосты\s*|\.xlsx|_\d+", "", path.split("/")[-1]).strip()
+        self.fabric = re.sub(r"Хвосты\s*|\.xlsx|_\d+", "", os.path.basename(path)).strip()
+
+    @staticmethod
+    def _element_columns(grid, header_row):
+        """Найти колонки (%, т) каждого элемента по подписям возле шапки.
+
+        Ищем «Элемент 28»/«Ni» в строках header±2; подпись стоит над парой (%, т).
+        Не нашли оба элемента — берём документированную раскладку по умолчанию."""
+        found = {}
+        for (r, col), v in grid.items():
+            if abs(r - header_row) > 2 or col <= ANCHOR_COL:
+                continue
+            s = str(v).strip()
+            el = next((e for k, e in ELEMENTS.items() if k in s), None) \
+                or (s if s in ELEMENT_SYMBOLS else None)
+            if el and el not in found:
+                found[el] = (col, col + 1)
+        if set(found) == set(DEFAULT_ELEMENT_COLUMNS) \
+                and len({c for c, _ in found.values()}) == len(found):
+            return found
+        return dict(DEFAULT_ELEMENT_COLUMNS)
 
     def read(self) -> TailingsProfile:
         ws = load_workbook(self.path, data_only=True).active
         grid = {(c.row, c.column): c.value for row in ws.iter_rows() for c in row
                 if c.value is not None}
-        prof = TailingsProfile(fabric=self.fabric, source=self.path.split("/")[-1])
+        prof = TailingsProfile(fabric=self.fabric, source=os.path.basename(self.path))
 
         # --- секция: берём ПОСЛЕДНЮЮ таблицу «Класс крупности» (отвальные общие) ---
         hdr_rows = sorted(r for (r, col), v in grid.items()
-                          if col == 2 and "Класс крупности" in str(v))
+                          if col == ANCHOR_COL and "Класс крупности" in str(v))
         if not hdr_rows:
             prof.warnings.append("не найден якорь «Класс крупности» — формат не распознан "
                                  "(другой отчёт? сменились подписи?). Профиль пуст.")
             return prof
         start = hdr_rows[-1]
 
-        # колонки: C=доля класса, D=%Ni, E=т Ni, F=%Cu, G=т Cu
-        ecol = {"Ni": (4, 5), "Cu": (6, 7)}  # (pct_col, tonnes_col)
+        ecol = self._element_columns(grid, start)  # {элемент: (pct_col, tonnes_col)}
 
         # --- таблица классов крупности ---
         r = start + 1
         classes: dict[str, ClassLoss] = {}
         while r < start + 12:
-            b = grid.get((r, 2))
+            b = grid.get((r, ANCHOR_COL))
             if b is None:
                 r += 1; continue
             if str(b).startswith("Итого"):
@@ -114,13 +141,13 @@ class TailingsReader:
             cl = ClassLoss(size_class=sc)
             for el, (_, tcol) in ecol.items():
                 cl.tonnes[el] = _num(grid.get((r, tcol)))
-                cl.cells[el] = f"{chr(64+tcol)}{r}"
+                cl.cells[el] = f"{get_column_letter(tcol)}{r}"
             classes[sc] = cl
             r += 1
 
         # --- блоки минералогии по классам (ниже таблицы, до конца листа) ---
         for (row, col), v in sorted(grid.items()):
-            if col != 2 or row <= start:
+            if col != ANCHOR_COL or row <= start:
                 continue
             s = str(v)
             if "мкм" not in s or "Итого" in s:
@@ -141,14 +168,15 @@ class TailingsReader:
                 f"распознано лишь {len(prof.classes)} классов крупности (ожидалось ~6) — "
                 "возможно, съехал формат или колонки.")
         for cl in prof.classes:
-            forms_t = sum(f.tonnes for f in cl.forms if f.element == "Ni")
-            class_t = cl.tonnes.get("Ni") or 0.0
+            el = PRIMARY_ELEMENT
+            forms_t = sum(f.tonnes for f in cl.forms if f.element == el)
+            class_t = cl.tonnes.get(el) or 0.0
             # баланс: сумма тонн по формам класса ≈ тоннам класса (±25%)
             if class_t and forms_t and abs(forms_t - class_t) / class_t > 0.25:
                 prof.warnings.append(
                     f"класс {cl.size_class}: сумма форм {forms_t:.0f} т ≠ итогу класса "
                     f"{class_t:.0f} т (>25%) — проверьте раскладку колонок.")
-            rec = cl.recoverable_tonnes("Ni")
+            rec = cl.recoverable_tonnes(el)
             if class_t and rec > class_t * 1.02:
                 prof.warnings.append(
                     f"класс {cl.size_class}: извлекаемого ({rec:.0f} т) больше всего "
@@ -159,7 +187,7 @@ class TailingsReader:
         forms_seen = {f.form + f.element for f in cl.forms}  # анти-дубли между секциями
         r = header_row + 1
         while r < header_row + 12:
-            b = grid.get((r, 2))
+            b = grid.get((r, ANCHOR_COL))
             if b is None:
                 r += 1; continue
             name = str(b).strip()
@@ -175,7 +203,7 @@ class TailingsReader:
                     continue
                 cl.forms.append(FormLoss(
                     form=name, element=el, tonnes=t or 0.0, pct=p or 0.0,
-                    recoverable=(name in RECOVERABLE[el]),
-                    cell=f"{chr(64+tcol)}{r}"))
+                    recoverable=(name in RECOVERABLE.get(el, set())),
+                    cell=f"{get_column_letter(tcol)}{r}"))
                 forms_seen.add(key)
             r += 1

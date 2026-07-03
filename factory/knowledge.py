@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import networkx as nx
 
-from factory.reader import SIZE_ORDER
+from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT, SIZE_ORDER
 
 
 class KnowledgeGraph:
@@ -20,17 +20,17 @@ class KnowledgeGraph:
 
     def _build(self):
         p = self.profile
-        for el in p.elements or {"Ni": {}, "Cu": {}}:
+        for el in p.elements or dict.fromkeys(ELEMENT_SYMBOLS, {}):
             self.g.add_node(f"el:{el}", kind="element", label=el)
         for cl in p.classes:
             self.g.add_node(f"cls:{cl.size_class}", kind="class", label=cl.size_class)
-            for el in ("Ni", "Cu"):
+            for el in ELEMENT_SYMBOLS:
                 t = cl.tonnes.get(el) or 0.0
                 if t:
                     self.g.add_edge(f"el:{el}", f"cls:{cl.size_class}",
                                     kind="loses", element=el, tonnes=round(t, 1))
             for f in cl.forms:
-                if f.element != "Ni":            # формы одинаковы для Ni/Cu — рисуем по Ni
+                if f.element != PRIMARY_ELEMENT:  # формы одинаковы — рисуем по ведущему
                     continue
                 fid = f"form:{f.form}"
                 self.g.add_node(fid, kind="form", label=f.form, recoverable=f.recoverable)

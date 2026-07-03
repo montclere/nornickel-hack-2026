@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import os
 
+from factory.config import DEFAULT_CACHE, DEFAULT_KPI, MIN_PROSE_CHARS, OUTPUTS_DIR
 from factory.ingest import ingest, split
 
 
@@ -35,9 +36,9 @@ def _is_tailings(path):
 def main():
     ap = argparse.ArgumentParser(description="Гибкая фабрика гипотез (загрузи что угодно)")
     ap.add_argument("paths", nargs="+", help="файлы или папки с материалами")
-    ap.add_argument("--kpi", default="снизить потери извлекаемого металла с хвостами")
+    ap.add_argument("--kpi", default=DEFAULT_KPI)
     ap.add_argument("--max-chunks", type=int, default=14)
-    ap.add_argument("--cache", default="outputs/kb_cache.json")
+    ap.add_argument("--cache", default=DEFAULT_CACHE)
     ap.add_argument("--no-cache", action="store_true")
     args = ap.parse_args()
 
@@ -70,8 +71,8 @@ def main():
         for t in tailings:
             res = HypothesisFactory(t, kpi=args.kpi).run()
             p, hyps = res["profile"], res["hypotheses"]
-            os.makedirs("outputs", exist_ok=True)
-            out = os.path.join("outputs", f"{p.fabric}_гипотезы.html")
+            os.makedirs(OUTPUTS_DIR, exist_ok=True)
+            out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
             open(out, "w", encoding="utf-8").write(res["html"])
             top = hyps[0] if hyps else None
             print(f"  ■ {p.fabric}: {len(hyps)} гипотез; топ — {top.statement_if if top else '—'}")
@@ -87,15 +88,15 @@ def main():
         print("ИЗВЛЕЧЕНИЕ ИЗ ТЕКСТА → ГРАФ → РАЗРЫВЫ СВОНСОНА")
         print("─" * 74)
         chunks = split(ingest(others))
-        prose = [c for c in chunks if c.kind == "prose" and len(c.text) >= 200]
+        prose = [c for c in chunks if c.kind == "prose" and len(c.text) >= MIN_PROSE_CHARS]
         print(f"текстовых фрагментов: {len(prose)}")
-        llm = Yandex(model="yandexgpt/latest", temperature=0.0)
+        llm = Yandex(temperature=0.0)
         if not llm.ready:
             print("⚠ нет ключа Yandex (.env) — извлечение из текста недоступно. "
                   "Отчёты по хвостам работают без ключа.")
             return
         cache = None if args.no_cache else args.cache
-        os.makedirs("outputs", exist_ok=True)
+        os.makedirs(OUTPUTS_DIR, exist_ok=True)
         rels = extract_relations(chunks, llm=llm, max_chunks=args.max_chunks,
                                  query=args.kpi, cache_path=cache, log=lambda m: print("  " + m))
         kg = KnowledgeGraph(rels)

@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from factory.metrics import Scorer
+from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT
 from factory.rules import diagnose
 
 
@@ -35,7 +36,7 @@ class HypothesisGenerator:
         self.scorer = scorer or Scorer()
 
     def generate(self, profile) -> list:
-        diagnoses = {cl.size_class: diagnose(cl.dominant_recoverable_form("Ni"),
+        diagnoses = {cl.size_class: diagnose(cl.dominant_recoverable_form(PRIMARY_ELEMENT),
                                              cl.size_class)
                      for cl in profile.classes}
         metrics = self.scorer.score_all(profile, diagnoses)
@@ -58,13 +59,14 @@ class HypothesisGenerator:
         primary = diag.interventions[0]
         tons = f"{rec.get('Ni',0)} т Ni + {rec.get('Cu',0)} т Cu"
         evidence = []
-        for el in ("Ni", "Cu"):
+        for el in ELEMENT_SYMBOLS:
             if cl.cells.get(el):
                 evidence.append({"label": f"потери {el} в классе {cl.size_class}",
                                  "cell": cl.cells[el], "source": None})
         # ячейка минералогии доминирующей формы
-        dom = cl.dominant_recoverable_form("Ni")
-        domf = next((f for f in cl.forms if f.form == dom and f.element == "Ni"), None)
+        dom = cl.dominant_recoverable_form(PRIMARY_ELEMENT)
+        domf = next((f for f in cl.forms
+                     if f.form == dom and f.element == PRIMARY_ELEMENT), None)
         if domf:
             evidence.append({"label": f"форма «{dom}» ({round(domf.pct,1)}%)",
                              "cell": domf.cell, "source": None})

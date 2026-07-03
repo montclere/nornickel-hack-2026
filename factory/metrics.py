@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT
+
 
 @dataclass
 class Metrics:
@@ -36,21 +38,22 @@ class Scorer:
     """Считает безразмерные метрики по данным профиля. Все веса — явные."""
 
     def _rec_total(self, cl) -> float:
-        return sum(cl.recoverable_tonnes(el) for el in ("Ni", "Cu"))
+        return sum(cl.recoverable_tonnes(el) for el in ELEMENT_SYMBOLS)
 
     def _class_total(self, cl) -> float:
-        return sum(cl.tonnes.get(el) or 0.0 for el in ("Ni", "Cu"))
+        return sum(cl.tonnes.get(el) or 0.0 for el in ELEMENT_SYMBOLS)
 
     def _clarity(self, cl) -> float:
         """Доля доминирующей извлекаемой формы среди извлекаемых (ясность механизма)."""
-        rec_forms = [f for f in cl.forms if f.element == "Ni" and f.recoverable and f.tonnes]
+        rec_forms = [f for f in cl.forms
+                     if f.element == PRIMARY_ELEMENT and f.recoverable and f.tonnes]
         if not rec_forms:
             return 0.0
         tot = sum(f.tonnes for f in rec_forms)
         return max(f.tonnes for f in rec_forms) / tot if tot else 0.0
 
     def confidence(self, cl) -> float:
-        forms = [f for f in cl.forms if f.element == "Ni"]
+        forms = [f for f in cl.forms if f.element == PRIMARY_ELEMENT]
         if not forms:
             return 0.3
         return 1.0 if any(f.tonnes for f in forms) else 0.6
@@ -61,7 +64,7 @@ class Scorer:
         out = {}
         for cl in profile.classes:
             diag = diagnoses.get(cl.size_class)
-            rec = {el: cl.recoverable_tonnes(el) for el in ("Ni", "Cu")}
+            rec = {el: cl.recoverable_tonnes(el) for el in ELEMENT_SYMBOLS}
             impact = rec_by[cl.size_class] / total_rec
             ctot = self._class_total(cl)
             addressability = (rec_by[cl.size_class] / ctot) if ctot else 0.0

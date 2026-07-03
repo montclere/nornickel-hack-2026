@@ -18,6 +18,8 @@ import re
 import zipfile
 from dataclasses import dataclass, field
 
+from factory.config import MAX_CHUNK_CHARS
+
 
 @dataclass
 class Chunk:
@@ -120,7 +122,7 @@ def _csv(path, name, meta):
     return [Chunk("\n".join(rows), name, name, "table", meta)] if rows else []
 
 
-def split(chunks, max_chars=3500) -> list:
+def split(chunks, max_chars=MAX_CHUNK_CHARS) -> list:
     """Резать длинные прозаические фрагменты по абзацам (окно LLM)."""
     out = []
     for c in chunks:

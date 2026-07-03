@@ -8,12 +8,12 @@
 """
 from __future__ import annotations
 
-from factory.reader import LIBERATED, LOCKED, SIZE_ORDER
+from factory.reader import LIBERATED, LOCKED, PRIMARY_ELEMENT, SIZE_ORDER
 from factory.rules import FORM_NOTES
 
 
 def _ni_forms(cl):
-    return [f for f in cl.forms if f.element == "Ni" and f.tonnes]
+    return [f for f in cl.forms if f.element == PRIMARY_ELEMENT and f.tonnes]
 
 
 def liberation_profile(profile):

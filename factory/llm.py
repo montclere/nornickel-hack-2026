@@ -10,32 +10,20 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
+import urllib.error
 import urllib.request
 
-BASE = "https://llm.api.cloud.yandex.net/foundationModels/v1"
-ENDPOINT = f"{BASE}/completion"
+from factory.config import LLM_MAX_RETRIES, YANDEX_BASE_URL, YANDEX_MODEL, load_env
 
-
-def load_env():
-    here = os.path.dirname(os.path.abspath(__file__))
-    d = here
-    for _ in range(4):
-        p = os.path.join(d, ".env")
-        if os.path.exists(p):
-            for line in open(p, encoding="utf-8"):
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip())
-            return True
-        d = os.path.dirname(d)
-    return False
+# коды, которые имеет смысл повторить (троттлинг/временные сбои сервера)
+_RETRY_CODES = {429, 500, 502, 503, 504}
 
 
 class Yandex:
     """Клиент Yandex AI Studio: chat + эмбеддинги. Для извлечения сущностей и новизны."""
 
-    def __init__(self, model="yandexgpt/latest", temperature=0.0, max_tokens=2000):
+    def __init__(self, model=YANDEX_MODEL, temperature=0.0, max_tokens=2000):
         load_env()
         self.key = os.environ.get("YANDEX_API_KEY")
         self.folder = os.environ.get("YANDEX_FOLDER_ID")
@@ -46,12 +34,36 @@ class Yandex:
         return bool(self.key and self.folder)
 
     def _post(self, path, payload, timeout=90):
+        """POST с экспоненциальным backoff на 429/5xx/сетевые сбои (учитывает Retry-After)."""
         req = urllib.request.Request(
-            f"{BASE}/{path}", data=json.dumps(payload).encode("utf-8"),
+            f"{YANDEX_BASE_URL}/{path}", data=json.dumps(payload).encode("utf-8"),
             headers={"Authorization": f"Api-Key {self.key}",
                      "Content-Type": "application/json"}, method="POST")
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read().decode("utf-8"))
+        last = None
+        for attempt in range(LLM_MAX_RETRIES + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    return json.loads(r.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code not in _RETRY_CODES or attempt == LLM_MAX_RETRIES:
+                    raise
+                ra = self._retry_after(e)
+                delay = ra if ra is not None else min(2 ** attempt, 30)
+                last = e
+            except urllib.error.URLError as e:      # SSL/обрыв соединения — тоже повторяем
+                if attempt == LLM_MAX_RETRIES:
+                    raise
+                delay = min(2 ** attempt, 30)
+                last = e
+            time.sleep(delay)
+        raise last                                  # недостижимо, но явно
+
+    @staticmethod
+    def _retry_after(err):
+        try:
+            return float(err.headers.get("Retry-After"))
+        except (TypeError, ValueError, AttributeError):
+            return None
 
     def complete(self, system, user, timeout=90):
         payload = {"modelUri": f"gpt://{self.folder}/{self.model}",
@@ -104,14 +116,12 @@ class Phraser:
               "не добавляя: не вводи новых чисел, классов, реагентов, оборудования. "
               "Верни ТОЛЬКО JSON {\"if\":..,\"then\":..,\"because\":..}.")
 
-    def __init__(self):
-        load_env()
-        self.key = os.environ.get("YANDEX_API_KEY")
-        self.folder = os.environ.get("YANDEX_FOLDER_ID")
+    def __init__(self, llm=None):
+        self.llm = llm or Yandex(max_tokens=600)
 
     @property
     def ready(self):
-        return bool(self.key and self.folder)
+        return self.llm.ready
 
     def polish(self, hyps):
         if not self.ready:
@@ -130,20 +140,8 @@ class Phraser:
     def _call(self, h):
         user = (f"ЕСЛИ: {h.statement_if}\nТО: {h.statement_then}\n"
                 f"ПОТОМУ ЧТО: {h.statement_because}")
-        payload = {"modelUri": f"gpt://{self.folder}/yandexgpt/latest",
-                   "completionOptions": {"stream": False, "temperature": 0.0,
-                                         "maxTokens": "600"},
-                   "messages": [{"role": "system", "text": self.SYSTEM},
-                                {"role": "user", "text": user}]}
-        req = urllib.request.Request(
-            ENDPOINT, data=json.dumps(payload).encode(),
-            headers={"Authorization": f"Api-Key {self.key}",
-                     "Content-Type": "application/json"}, method="POST")
-        with urllib.request.urlopen(req, timeout=60) as r:
-            d = json.loads(r.read().decode())
-        txt = d["result"]["alternatives"][0]["message"]["text"]
-        i, j = txt.find("{"), txt.rfind("}")
-        return json.loads(txt[i:j + 1]) if i >= 0 else None
+        out = extract_json(self.llm.complete(self.SYSTEM, user, timeout=60))
+        return out if isinstance(out, dict) else None
 
     @staticmethod
     def _safe(out, h):

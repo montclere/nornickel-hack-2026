@@ -48,7 +48,13 @@ LLM только извлекает; вывод (граф, разрывы, ра�
 ### Отчёт и оценка
 - `report.py`/`glossary.py` → самодостаточный HTML: граф (SVG), кривая раскрытия, форм-таблица,
   карточки, глоссарий метрик. `outputs/<фабрика>_гипотезы.html`.
-- `benchmark.py` → сверка гипотез со всеми эталонными `Гипотезы*.docx` по семействам вмешательства.
+- `benchmark.py` → сверка гипотез со всеми эталонными `Гипотезы*.docx` по семействам вмешательства
+  (метрика ветки А, golden-coverage).
+- `judge.py` → **LLM-as-judge** — метрика качества ветки Б. Судья читает каждую гипотезу вместе
+  с её цитатами-источниками и ставит баллы 1..5 по рубрике (обоснованность · правдоподобность ·
+  релевантность KPI · неочевидность · проверяемость). Оценочный слой ВНЕ ранжирования (LLM не
+  в рассуждении); вердикты кэшируются по отпечатку → воспроизводимы. По умолчанию судья — та же
+  модель Yandex (`JUDGE_MODEL` заменяем: в идеале судья ≠ генератору).
 - `docs/build_guide.py` → PDF-гайд разработчика (reportlab).
 
 ## Запуск
@@ -58,10 +64,17 @@ uv sync
 uv run python -m factory.flex materials --kpi "снизить потери никеля с хвостами" --max-chunks 24
 # одна фабрика с HTML
 uv run python -m factory "materials/fabrics/ТОФ/Хвосты ТОФ_2.xlsx"
-# сверка со всеми эталонами
+# сверка со всеми эталонами (метрика ветки А)
 uv run python -m factory.benchmark
+# качество гипотез ветки Б: LLM-as-judge по рубрике (нужен ключ Yandex)
+uv run python -m factory.judge materials/reference/books --kpi "снизить потери никеля"
 ```
 Детерминированное ядро работает без сети/ключа. LLM-ветка требует `YANDEX_API_KEY` в `.env`.
+
+Настройка — через env / `.env` (см. `factory/config.py`): `FACTORY_KPI`, `FACTORY_OUTPUTS`,
+`YANDEX_MODEL`, `YANDEX_BASE_URL`, `FACTORY_LLM_WORKERS` (параллельность извлечения),
+`FACTORY_MAX_CHUNK_CHARS`, `FACTORY_MIN_PROSE_CHARS`. LLM-вызовы идут параллельно,
+кэш графа несёт отпечаток входа (KPI+фрагменты) и сам инвалидируется при их смене.
 
 ## Результаты (реальные данные)
 - Детерминированная диагностика: 4 фабрики, гипотезы ранжированы по impact, каждое число —
@@ -101,7 +114,7 @@ uv run python -m factory.benchmark
 factory/
   ingest.py extract.py kgraph.py discover.py flex.py   ← гибкая ветка (текст → граф → открытие)
   reader.py analysis.py rules.py metrics.py generator.py pipeline.py  ← детерминированная ветка (хвосты)
-  llm.py report.py glossary.py benchmark.py evaluate.py docs/build_guide.py
+  config.py llm.py report.py glossary.py benchmark.py evaluate.py docs/build_guide.py
 materials/   fabrics/<Ф>/ (Хвосты+Гипотезы) · reference/ (books/schemes/regulations)   [вне git]
 outputs/     сгенерированные HTML/кэш   [вне git]
 ```

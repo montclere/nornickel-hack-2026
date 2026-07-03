@@ -6,15 +6,22 @@
 принимается ТОЛЬКО если цитата реально есть во фрагменте → выдумки отсекаются.
 После кэширования весь downstream детерминирован (тот же кэш → тот же граф).
 
+Кэш несёт отпечаток (KPI + выбранные фрагменты): смена запроса или корпуса
+автоматически инвалидирует его. LLM-вызовы идут параллельно (LLM_WORKERS),
+результат собирается в порядке фрагментов → вывод детерминирован.
+
 Структура НЕ хардкодится: работает на любом тексте; тип связи выбирается из закрытого
 словаря, поэтому знак влияния детерминирован (критик знаков не нужен).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 
+from factory.config import LLM_WORKERS, MAX_CHUNK_CHARS, MIN_PROSE_CHARS
 from factory.llm import Yandex, extract_json
 
 # закрытый словарь типов связи → знак (LLM только ВЫБИРАЕТ тип, знак ставим мы)
@@ -52,7 +59,7 @@ def _tokens(s):
 
 
 def _select(chunks, max_chunks, query):
-    prose = [c for c in chunks if c.kind == "prose" and len(c.text) >= 200
+    prose = [c for c in chunks if c.kind == "prose" and len(c.text) >= MIN_PROSE_CHARS
              and sum(ch.isalpha() for ch in c.text) / max(len(c.text), 1) >= 0.55]
     if query:
         qt = _tokens(query)
@@ -62,28 +69,65 @@ def _select(chunks, max_chunks, query):
     return prose[:max_chunks]
 
 
+def _fingerprint(selected, query):
+    """Отпечаток входа: KPI + выбранные фрагменты. Меняется вход → кэш недействителен."""
+    h = hashlib.sha256((query or "").encode("utf-8"))
+    for c in selected:
+        h.update(c.text[:MAX_CHUNK_CHARS].encode("utf-8"))
+    return h.hexdigest()[:16]
+
+
+def _load_cache(cache_path, fp, log):
+    if not (cache_path and os.path.exists(cache_path)):
+        return None
+    cached = json.load(open(cache_path, encoding="utf-8"))
+    if isinstance(cached, list):                 # старый формат — без отпечатка
+        if cached:
+            log(f"кэш графа (legacy): {os.path.basename(cache_path)} ({len(cached)} связей)")
+            return cached
+        return None
+    rels = cached.get("relations") or []
+    if cached.get("fingerprint") != fp:
+        log("кэш от другого входа (KPI/корпус изменились) — переизвлекаю")
+        return None
+    if rels:
+        log(f"кэш графа: {os.path.basename(cache_path)} ({len(rels)} связей)")
+        return rels
+    return None
+
+
+def _ask(llm, chunk):
+    """Один LLM-вызов; исключение возвращаем значением (для параллельного map)."""
+    try:
+        raw = llm.complete(SYSTEM, PROMPT.format(chunk=chunk.text[:MAX_CHUNK_CHARS],
+                                                 rel=", ".join(RELATION_VOCAB)))
+        return extract_json(raw) or []
+    except Exception as e:  # noqa: BLE001
+        return e
+
+
 def extract_relations(chunks, llm=None, max_chunks=12, query=None,
                       cache_path=None, log=lambda *a: None):
     """chunks → список связей с провенансом. Кэш делает downstream детерминированным."""
-    if cache_path and os.path.exists(cache_path):
-        cached = json.load(open(cache_path, encoding="utf-8"))
-        if cached:                       # пустой кэш не считаем валидным → переизвлекаем
-            log(f"кэш графа: {os.path.basename(cache_path)} ({len(cached)} связей)")
-            return cached
-        log("кэш пуст — переизвлекаю")
+    selected = _select(chunks, max_chunks, query)
+    fp = _fingerprint(selected, query)
+    cached = _load_cache(cache_path, fp, log)
+    if cached is not None:
+        return cached
 
-    llm = llm or Yandex(model="yandexgpt/latest", temperature=0.0)
+    llm = llm or Yandex(temperature=0.0)
     if not llm.ready:
         raise RuntimeError("нет ключа Yandex (.env) — извлечение из текста требует LLM")
 
+    # параллельные вызовы; map отдаёт результаты в порядке фрагментов → детерминизм
+    workers = max(1, min(LLM_WORKERS, len(selected)))
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        answers = list(ex.map(lambda c: _ask(llm, c), selected))
+
     rels, stats = [], {"raw": 0, "kept": 0, "dropped": 0}
-    for i, c in enumerate(_select(chunks, max_chunks, query), 1):
-        try:
-            raw = llm.complete(SYSTEM, PROMPT.format(chunk=c.text[:3500],
-                                                     rel=", ".join(RELATION_VOCAB)))
-            triples = extract_json(raw) or []
-        except Exception as e:  # noqa: BLE001
-            log(f"  фрагмент {i}: ошибка LLM ({e})"); continue
+    for i, (c, triples) in enumerate(zip(selected, answers), 1):
+        if isinstance(triples, Exception):
+            log(f"  фрагмент {i}: ошибка LLM ({triples})"); continue
         if not isinstance(triples, list):
             continue
         nt = _norm(c.text); kept = 0
@@ -99,9 +143,10 @@ def extract_relations(chunks, llm=None, max_chunks=12, query=None,
                          "source": c.source, "locator": c.locator, "meta": c.meta})
             kept += 1
         stats["kept"] += kept
-        log(f"  {i}/{max_chunks} [{c.locator}]: +{kept} связей")
+        log(f"  {i}/{len(selected)} [{c.locator}]: +{kept} связей")
     log(f"извлечено {stats['kept']} связей (сырых {stats['raw']}, "
         f"отброшено гейтом {stats['dropped']})")
     if cache_path and rels:              # пустой результат не кэшируем
-        json.dump(rels, open(cache_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        json.dump({"fingerprint": fp, "relations": rels},
+                  open(cache_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return rels

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import html
 
+from factory.config import DEFAULT_KPI
+
 
 def _esc(x):
     return html.escape(str(x if x is not None else ""))
@@ -242,7 +244,7 @@ footer a{{color:var(--blue);text-decoration:none}}
   <h1>Фабрика <span>гипотез</span> · {_esc(profile.fabric)}</h1>
   <div class="sub">детерминированный граф из данных · метрики и логика воспроизводимы · LLM только оформляет текст</div>
   {"".join(f'<div class="warn">⚠ {_esc(w)}</div>' for w in getattr(profile, "warnings", []))}
-  <div class="kpi"><b>KPI</b> &nbsp;{_esc(kpi or "снизить потери извлекаемого металла с хвостами")}</div>
+  <div class="kpi"><b>KPI</b> &nbsp;{_esc(kpi or DEFAULT_KPI)}</div>
   <div class="summary">
     <span><b>{total_ni} т</b><br>извлекаемого Ni в хвостах (факт)</span>
     <span><b>{total_cu} т</b><br>извлекаемого Cu в хвостах (факт)</span>

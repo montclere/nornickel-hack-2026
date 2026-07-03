@@ -9,6 +9,7 @@ from __future__ import annotations
 import time
 
 from factory.analysis import analyze
+from factory.config import DEFAULT_KPI, OUTPUTS_DIR
 from factory.generator import HypothesisGenerator
 from factory.knowledge import KnowledgeGraph
 from factory.reader import TailingsReader
@@ -18,7 +19,7 @@ from factory.report import render
 class HypothesisFactory:
     def __init__(self, path: str, kpi: str = "", polish: bool = False):
         self.path = path
-        self.kpi = kpi or "снизить потери извлекаемого металла с хвостами флотации"
+        self.kpi = kpi or DEFAULT_KPI
         self.polish = polish
 
     def run(self):
@@ -89,8 +90,8 @@ def main():
     if args.out:
         out = args.out
     else:
-        os.makedirs("outputs", exist_ok=True)
-        out = os.path.join("outputs", f"{p.fabric}_гипотезы.html")
+        os.makedirs(OUTPUTS_DIR, exist_ok=True)
+        out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
     open(out, "w", encoding="utf-8").write(res["html"])
     from factory.glossary import write as write_glossary
     write_glossary(os.path.dirname(out) or ".")   # glossary.html рядом (ссылка из отчёта)
