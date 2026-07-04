@@ -37,6 +37,7 @@ class Hypothesis:
     sources: list
     violates_constraints: list = field(default_factory=list)  # ограничения из промпта, которые нарушены
     world_practice: str | None = None   # TODO(веб-поиск): подтверждение внедрения в мировой практике
+    expert_feedback: dict | None = None  # вердикт эксперта из feedback.json (см. feedback.py)
     metrics: dict = field(default_factory=dict)
     rank: int = 0
 

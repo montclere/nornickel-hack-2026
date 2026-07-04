@@ -85,6 +85,7 @@ def _record(h) -> dict:
         "sources": list(g("sources", []) or []),
         "violates_constraints": list(g("violates_constraints", []) or []),
         "world_practice": g("world_practice", None),
+        "expert_feedback": g("expert_feedback", None),   # вердикт из feedback.json (если был)
         "metrics": dict(g("metrics", {}) or {}),
     }
 
@@ -96,8 +97,10 @@ def write_json(data: dict, path: str) -> str:
     return path
 
 
-# колонки CSV эксперта; две последние — ПУСТЫЕ, их заполняет эксперт в Excel
-# (вердикт: полезно / неверно / уже пробовали), реимпорт — следующий шаг плана
+# колонки CSV эксперта; две последние заполняет эксперт в Excel (вердикт: полезно /
+# неверно / уже пробовали). Если фидбэк по гипотезе уже есть (feedback.json) — они
+# ПРЕДЗАПОЛНЯЮТСЯ текущим значением: эксперт видит и правит, а не вспоминает.
+# Реимпорт: python -m factory.feedback import <этот csv>
 _CSV_HEADER = ["ранг", "фабрика", "класс", "семейство", "вмешательство",
                "целевой_элемент", "impact_%", "приоритет", "извлекаемо_т",
                "излечимость", "ясность", "реализуемость", "достоверность",
@@ -129,7 +132,9 @@ def write_csv(data: dict, path: str) -> str:
                 "; ".join(r["violates_constraints"]),
                 (wp or {}).get("url", "") if isinstance(wp, dict) else "",
                 "; ".join(r["alternatives"]),
-                "", ""])                                   # ← поля эксперта
+                # поля эксперта: предзаполнены текущим фидбэком (round-trip), иначе пустые
+                (r.get("expert_feedback") or {}).get("verdict", "").replace("_", " "),
+                (r.get("expert_feedback") or {}).get("note", "")])
     return path
 
 

@@ -38,6 +38,11 @@ class HypothesisFactory:
         analysis = analyze(profile, element=intent.target_element)  # кривая раскрытия / формы
         hyps = HypothesisGenerator().generate(profile, kpi=self.kpi)  # диагноз + метрики (детерм.)
 
+        # фидбэк эксперта (outputs/feedback.json, наполняется factory.feedback import):
+        # детерминированный ре-ранк — «уже пробовали»/«неверно» опускаются, не скрываясь
+        from factory.feedback import apply_feedback
+        fb_applied = apply_feedback(hyps, profile.fabric)
+
         used_llm = "нет"
         if self.polish:
             from factory.llm import Phraser
@@ -46,7 +51,7 @@ class HypothesisFactory:
                 hyps = ph.polish(hyps)
                 used_llm = "да (только текст)"
         tech = {"seconds": round(time.perf_counter() - t0, 2), "llm": used_llm,
-                **graph.stats()}
+                "feedback": fb_applied, **graph.stats()}
         html = render(profile, graph.to_layered(), hyps, kpi=self.kpi, tech=tech,
                       analysis=analysis)
         return {"profile": profile, "graph": graph, "analysis": analysis, "intent": intent,
@@ -89,6 +94,9 @@ def main():
           f"{tech['edges']} рёбер · LLM: {tech['llm']}")
     print("=" * 74)
     warn_intent(res["intent"], args.kpi)
+    if tech.get("feedback"):
+        print(f"⚑ применён фидбэк эксперта к {tech['feedback']} гипотезам — приоритеты "
+              f"скорректированы (база: feedback.json, см. factory.feedback)")
     if p.warnings:
         print("⚠ ВАЛИДАЦИЯ (парс мог сбиться):")
         for w in p.warnings:
