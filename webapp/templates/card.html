@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}#{{ h.rank }} {{ h.intervention }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/runs/{{ run_id }}">← к списку гипотез</a></div>
+
+<div class="dhead">
+  <div class="hrank big">{{ h.rank }}</div>
+  <div>
+    <h1>{{ h.intervention }}</h1>
+    <div class="dmeta">{{ meta.fabric }} · класс {{ h.size_class }} · {{ h.family }}
+      {% if h.secondary %}· второе направление{% endif %}</div>
+  </div>
+  <div class="himpact big">{{ (h.metrics.impact * 100) | round | int }}%<span>потерь {{ h.target_element }}</span></div>
+</div>
+
+{% if h.violates_constraints %}<div class="warn">нарушает ограничение: {{ h.violates_constraints|join(', ') }}
+  — приоритет занижен, гипотеза не скрыта</div>{% endif %}
+{% if h.expert_feedback %}<div class="fb">фидбэк эксперта: <b>{{ h.expert_feedback.verdict }}</b>
+  {% if h.expert_feedback.note %}— «{{ h.expert_feedback.note }}»{% endif %}
+  · приоритет ×{{ h.expert_feedback.multiplier }}</div>{% endif %}
+
+<div class="tri">
+  <div class="row"><span>если</span><p>{{ h.statement_if }}</p></div>
+  <div class="row"><span>то</span><p>{{ h.statement_then }}</p></div>
+  <div class="row"><span class="bc">потому что</span><p class="muted">{{ h.statement_because }}</p></div>
+</div>
+
+<div class="metrics-row">
+  <span><b>{{ h.metrics.priority }}</b> приоритет</span>
+  <span><b>{{ h.metrics.addressability }}</b> излечимость</span>
+  <span><b>{{ h.metrics.clarity }}</b> ясность</span>
+  <span><b>{{ h.metrics.feasibility }}</b> реализуемость</span>
+  {% for sym, t in h.metrics.rec_tonnes.items() %}<span><b>{{ t }}</b> т {{ sym }}</span>{% endfor %}
+</div>
+
+<div class="block">
+  <h3>Эксперимент</h3>
+  <div class="exprow"><span>тест</span><p>{{ h.exp_test or h.experiment }}</p></div>
+  {% if h.exp_metric %}<div class="exprow"><span>метрика</span><p>{{ h.exp_metric }}</p></div>{% endif %}
+  {% if h.exp_criterion %}<div class="exprow"><span>критерий</span><p>{{ h.exp_criterion }}</p></div>{% endif %}
+</div>
+
+{% if h.roadmap %}
+<div class="block">
+  <h3>Дорожная карта (лаборатория → пилот → внедрение)</h3>
+  <ol class="rm">
+    {% for s in h.roadmap %}<li><b>{{ s.name }}.</b> {{ s.actions }}
+      <span class="crit">критерий перехода: {{ s.success }}</span></li>{% endfor %}
+  </ol>
+</div>
+{% endif %}
+
+<div class="block">
+  <h3>Заземление — ячейки отчёта</h3>
+  <ul class="ev">
+    {% for e in h.evidence %}
+    <li>{{ e.label }} —
+      {% if e.source %}<a href="/runs/{{ run_id }}/sources/data/{{ e.source }}"
+         target="_blank" rel="noopener">{{ e.source }} · {{ e.cell }}</a>
+      {% else %}{{ e.cell }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <div class="muted small">Основание метода: {{ h.sources|join('; ') }}</div>
+</div>
+
+{% if h.literature %}
+<div class="block">
+  <h3>Подтверждение из выданного корпуса</h3>
+  {% for lq in h.literature %}
+  <blockquote class="q">«{{ lq.quote }}»<span class="loc">{{ lq.locator or lq.source }}</span></blockquote>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if h.world_practice and h.world_practice.url %}
+<div class="block">
+  <h3>Мировая практика</h3>
+  <blockquote class="q">«{{ h.world_practice.quote }}»</blockquote>
+  <div class="small">источник:
+    <a href="{{ h.world_practice.url }}" target="_blank" rel="noopener">{{ h.world_practice.site }}</a></div>
+</div>
+{% endif %}
+
+{% if h.dossier %}
+<div class="block">
+  <h3>Доказательная база (OpenAlex)</h3>
+  {% for d in h.dossier %}
+  <div class="dosrc">
+    <div><span class="cit">{{ d.cited_by }} цит.</span>
+      <a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.title }}</a>
+      <span class="muted">{{ d.year }}</span></div>
+    <div class="q">«{{ d.quote }}»</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="muted small">Каждое число — из ячейки отчёта. Приоритет — наша эвристическая
+  свёртка (формула в глоссарии), масштаб (impact) ведёт.</div>
+{% endblock %}

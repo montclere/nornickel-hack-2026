@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Прогон {{ run_id }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/">← новый прогон</a></div>
+<h1>Гипотезы</h1>
+<div class="kpi-bar"><b>KPI</b> {{ result.kpi }}
+  {% if result.target_element %}<span class="chip">элемент: {{ result.target_element }}
+    {% if not result.element_in_schema %}· ВНЕ схемы хвостов{% endif %}</span>{% endif %}</div>
+{% for w in result.warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+
+<div class="reports">
+  {% for name in result.reports %}
+    <a class="rep" href="/runs/{{ run_id }}/report/{{ name }}" target="_blank" rel="noopener">{{ name }}</a>
+  {% endfor %}
+  <a class="rep" href="/runs/{{ run_id }}/report/glossary.html" target="_blank" rel="noopener">глоссарий</a>
+</div>
+
+{% for fabric in result.fabrics %}
+  {% set fi = loop.index0 %}
+  {% set m = fabric.meta %}
+  <section class="fabric">
+    <h2>{{ m.fabric }} <span class="src">источник: {{ m.source }}</span></h2>
+    <div class="fmeta">
+      {% for sym, t in m.recoverable_tonnes_total.items() %}<span>{{ t }} т {{ sym }} извлек.</span>{% endfor %}
+      <span>топ-3 адресуют ~{{ m.kpi_potential_top3_pct }}% потерь</span>
+      <span>{{ fabric.hypotheses|length }} гипотез</span>
+    </div>
+    <div class="grid">
+      {% for h in fabric.hypotheses %}
+      {% set im = (h.metrics.impact * 100) | round | int %}
+      <a class="hcard" href="/runs/{{ run_id }}/hyp/{{ fi }}/{{ h.rank }}">
+        <div class="top-row">
+          <div class="hrank">{{ h.rank }}</div>
+          <div class="himpact">{{ im }}%<span>потерь {{ m.target_element }}</span></div>
+        </div>
+        <div class="hfam">{{ h.family }}{% if h.secondary %} · второе направление{% endif %}</div>
+        <div class="hint">{{ h.intervention }}</div>
+        <div class="hprio">приоритет {{ h.metrics.priority }}
+          {% if h.expert_feedback %}· фидбэк: {{ h.expert_feedback.verdict }}{% endif %}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+{% endfor %}
+
+{% if not result.fabrics %}
+  <p class="muted">Гипотез по хвостам нет (не загружены отчёты <code>.xlsx</code>, или целевого
+  элемента нет в схеме). {% if result.literature_report %}Смотрите отчёт из литературы выше.{% endif %}</p>
+{% endif %}
+
+{% if metrics and metrics.total and metrics.total.calls %}
+<div class="metrics">
+  <b>Метрики прогона:</b> {{ metrics.total.calls }} внешних вызовов ·
+  {{ metrics.total.retries }} ретраев · {{ metrics.total.errors }} ошибок ·
+  токены LLM {{ metrics.total.tokens_in }}→{{ metrics.total.tokens_out }} ·
+  {{ metrics.wall_seconds }} c
+</div>
+{% endif %}
+{% endblock %}
