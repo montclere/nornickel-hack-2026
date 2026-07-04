@@ -212,6 +212,19 @@ def main():
             print(f"     ПЧ:   {d.statement_because}")
             print(f"     источники: {', '.join(s for s in d.sources if s)}")
 
+        # HTML-отчёт ветки Б — раньше жил только в консоли, а для кейсов без
+        # структурных данных (металлургия: схема+описание+промпт) это ЕДИНСТВЕННЫЙ
+        # результат — теперь у него такой же визуальный артефакт, как у ветки А
+        from factory.report_kb import render_kb
+        stats = kg.stats()
+        tech = {"фрагментов": len(prose), "связей в кэше": len(rels),
+                "узлов графа": stats["nodes"], "рёбер": stats["edges"],
+                "кэш": cache or "выкл", "запрос к литературе": query}
+        out_kb = os.path.join(OUTPUTS_DIR, "литература_гипотезы.html")
+        open(out_kb, "w", encoding="utf-8").write(
+            render_kb(kg.to_layered(max_nodes=24), found, kpi=args.kpi, tech=tech))
+        print(f"\n  HTML-отчёт ветки Б: {out_kb}")
+
     print("\n" + "=" * 74)
     print("Детерминизм — в рассуждении; LLM — только в понимании текста (с цитатным гейтом).")
     print("=" * 74)

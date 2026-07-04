@@ -110,6 +110,11 @@ discover.py  разрывы Свонсона (A→B, B→C, нет A→C) + пр
              промышленные действия (is_action) получают бонус к рангу и формулируются как
              рекомендация «внедрить X»; абстрактные факты — честно как «исследовать
              применимость», не выдаются за готовое решение. Детерминированно поверх кэша.
+report_kb.py HTML-отчёт ветки Б: SVG-граф связей (цвет ребра = знак влияния) + карточки
+             открытий с дословными цитатами до страницы и бейджами честности
+             (внедрить/исследовать · разрыв Свонсона/прямая связь · состояние/справочное).
+             Пишется flex.py в outputs/литература_гипотезы.html — для кейсов без
+             структурных данных (металлургия: схема+описание+промпт) это основной артефакт.
 ```
 LLM только извлекает; вывод (граф, разрывы, ранг) детерминирован после кэша. Единственное
 место, реально зовущее LLM на извлечение — `extract_relations`, вызывается из `flex.py`.
@@ -194,8 +199,10 @@ uv run python -m factory.benchmark --no-judge [materials/data/fabrics]
 uv run python -m factory.flex materials --kpi "снизить потери никеля с хвостами" \
   [--max-chunks 24] [--cache outputs/kb_cache.json] [--no-cache]
 ```
-Пишет HTML по каждой найденной фабрике в `outputs/` и кэш графа литературы
-(`--cache`, по умолчанию `outputs/kb_cache.json`) — на нём работают команды ниже.
+Пишет HTML по каждой найденной фабрике в `outputs/`, HTML-отчёт по литературе
+(`outputs/литература_гипотезы.html` — граф связей + карточки с цитатами; см.
+`report_kb.py`) и кэш графа литературы (`--cache`, по умолчанию
+`outputs/kb_cache.json`) — на нём работают команды ниже.
 
 **2. Судья — после flex, читает кэш.** Оценивает ВСЕ гипотезы системы (хвосты + то,
 что нашёл flex в литературе) по единой рубрике 1..5. `--kpi` **обязателен** — судья
@@ -310,7 +317,7 @@ KPI НЕ настраивается через env/дефолт — только
 ```
 factory/
   schema.py schema_bootstrap.py intent.py               ← конфиг формата + разбор KPI (без LLM в ядре)
-  ingest.py extract.py kgraph.py discover.py flex.py     ← гибкая ветка (текст → граф → открытие)
+  ingest.py extract.py kgraph.py discover.py flex.py report_kb.py  ← гибкая ветка (текст → граф → открытие → HTML)
   reader.py analysis.py rules.py metrics.py generator.py pipeline.py  ← детерминированная ветка (хвосты)
   config.py llm.py report.py glossary.py evaluate.py benchmark.py judge.py docs/build_guide.py
 materials/   fabrics/<Ф>/ (Хвосты+Гипотезы) · reference/ (books/schemes/regulations)   [вне git]
