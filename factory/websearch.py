@@ -23,7 +23,8 @@ from dataclasses import asdict, dataclass
 
 from factory.client import get_text
 from factory.config import (WEB_CACHE, WEB_FETCH_TIMEOUT, WEB_INDUSTRIAL_DOMAINS,
-                            WEB_MAX_HYPS, WEB_MAX_RESULTS, WEB_PAGE_CHARS, WEB_RU_DOMAINS,
+                            WEB_MAX_HYPS, WEB_MAX_RESULTS, WEB_MIN_QUOTE_CHARS,
+                            WEB_MIN_QUOTE_WORDS, WEB_PAGE_CHARS, WEB_RU_DOMAINS,
                             WEB_SEARCH_ENABLED)
 from factory.openalex import _en_query               # общий доменный словарь RU→EN
 
@@ -95,6 +96,75 @@ def _pick_sentence(text: str, terms: set) -> tuple:
         if h > hits:
             best, hits = s, h
     return best, hits
+
+
+# ---------- контент страницы: тело без обвязки (фикс «цитаты-заголовки») ----------
+# Раньше в LLM уходили первые N символов страницы «как есть» — то есть title, меню,
+# навигация и cookie-баннеры. Модель честно выбирала «цитату» из этого мусора —
+# получался заголовок страницы: он дословно есть на странице (гейт проходил), но
+# ничего не подтверждает. Теперь: (1) обвязка вырезается, (2) текст режется на
+# СОДЕРЖАТЕЛЬНЫЕ абзацы, (3) в LLM идут абзацы, релевантные вмешательству,
+# (4) после LLM цитата проходит детерминированный гейт КАЧЕСТВА (не заголовок).
+
+_DROP_TAGS = ("script", "style", "noscript", "head", "header", "footer", "nav",
+              "aside", "form", "svg", "button", "select")
+
+
+def _page_content(doc: str) -> tuple:
+    """HTML → (title, [содержательные абзацы тела]). Заголовки/пункты меню короче
+    порога отсеиваются — из них нельзя брать цитату-доказательство."""
+    m = re.search(r"(?is)<title[^>]*>(.*?)</title>", doc)
+    title = re.sub(r"\s+", " ", html.unescape(m.group(1))).strip() if m else ""
+    for t in _DROP_TAGS:
+        doc = re.sub(rf"(?is)<{t}[^>]*>.*?</{t}>", " ", doc)
+    # граница абзаца — только КОНЕЦ БЛОЧНОГО ТЕГА (маркер \x00), а не переносы строк
+    # в исходнике: иначе <p> с переносами внутри развалится на фрагменты-«абзацы»
+    doc = re.sub(r"(?is)<br\s*/?>|</p>|</div>|</li>|</h[1-6]>|</tr>|</section>|</article>",
+                 "\x00", doc)
+    text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", doc))
+    paras = []
+    for block in text.split("\x00"):
+        p = re.sub(r"\s+", " ", block).strip()   # схлопнуть и пробелы, и переносы
+        # абзац «содержательный»: достаточно длинный и в основном из букв
+        if len(p) >= 60 and sum(ch.isalpha() for ch in p) / len(p) >= 0.5:
+            paras.append(p)
+    return title, paras
+
+
+def _tok(s: str) -> set:
+    return set(re.findall(r"[а-яёa-z0-9]{3,}", (s or "").lower()))
+
+
+def _relevant_excerpt(paras: list, qtokens: set, limit=WEB_PAGE_CHARS) -> str:
+    """Собрать для LLM выжимку из абзацев, РЕЛЕВАНТНЫХ запросу (пересечение токенов),
+    в исходном порядке — а не первые N символов страницы, где живёт обвязка."""
+    scored = sorted(((len(_tok(p) & qtokens), i) for i, p in enumerate(paras)),
+                    key=lambda t: (-t[0], t[1]))
+    picked, total = [], 0
+    for _, i in scored:
+        if total >= limit:
+            break
+        picked.append(i); total += len(paras[i]) + 1
+    return "\n".join(paras[i] for i in sorted(picked))[:limit]
+
+
+def _quote_quality(quote: str, title: str, paras: list) -> bool:
+    """Цитата — предложение из ОСНОВНОГО текста, а не заголовок/название страницы.
+    Детерминированные признаки, поверх дословного гейта:
+      • минимум длины и слов (заголовки короткие);
+      • не совпадает с <title> страницы (в обе стороны, по канон-форме);
+      • абзац-носитель заметно длиннее самой цитаты (иначе это строка-заголовок)."""
+    if len(quote) < WEB_MIN_QUOTE_CHARS:
+        return False
+    if len(re.findall(r"[а-яёa-z0-9]+", quote.lower())) < WEB_MIN_QUOTE_WORDS:
+        return False
+    cq, ct = _canon(quote), _canon(title)
+    if ct and (cq in ct or ct in cq):
+        return False
+    host = next((p for p in paras if cq in _canon(p)), None)
+    if host is not None and len(host) < max(len(quote) + 40, 160):
+        return False
+    return True
 
 
 # ---------- поиск (DuckDuckGo HTML, без ключа) ----------
@@ -173,7 +243,9 @@ class WebPractices:
         return found
 
     def find(self, intervention, family="", element="", extra="") -> "WorldPractice | None":
-        key = self._key("det1", intervention, family, element, extra)
+        # v3: версия схемы кэша — поднята после ввода гейта качества цитат, чтобы
+        # старые «цитаты-заголовки» не пережили фикс
+        key = self._key("v3det", intervention, family, element, extra)
         if key in self._cache:
             c = self._cache[key]
             return WorldPractice(**c) if c else None
@@ -196,6 +268,10 @@ class WebPractices:
         return qs
 
     def _find_uncached(self, intervention, family, element, extra):
+        # ДЕТЕРМИНИРОВАННО (без LLM), но с гейтом качества товарища: тело страницы
+        # чистится от обвязки (_page_content срезает nav/меню/шапку), предложение
+        # выбирается по терминам вмешательства, и оно обязано пройти _quote_quality
+        # (не заголовок/название). Русские соседи ранжируются выше мировых.
         terms = self._terms(intervention, family, element)
         best = None                                     # (score, WorldPractice)
         seen = set()
@@ -205,17 +281,18 @@ class WebPractices:
                     continue
                 seen.add(url)
                 try:
-                    text = _strip_html(_get(url))
+                    title, paras = _page_content(_get(url))
                 except Exception:  # noqa: BLE001
                     continue
-                sent, hits = _pick_sentence(text, terms)
-                if hits < 2 or len(sent) < 40:          # нужна реальная привязка к теме
+                sent, hits = _pick_sentence("\n".join(paras), terms)
+                # гейт качества: содержательное предложение из тела, не заголовок/меню
+                if hits < 2 or not _quote_quality(sent, title, paras):
                     continue
-                # приоритет: русские соседи > индустриальные > прочие; при равенстве — больше попаданий
+                # приоритет: русские соседи > индустриальные > прочие; при равенстве — попадания
                 score = (-_rank_key(url), hits)
                 if best is None or score > best[0]:
                     best = (score, WorldPractice(practice=sent, quote=sent, url=url,
                                                  site=_domain(url), query=q))
-            if best and best[0][0] == 0:                # уже нашли русского соседа — достаточно
+            if best and best[0][0] == 0:                # нашли русского соседа — достаточно
                 break
         return best[1] if best else None

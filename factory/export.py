@@ -81,9 +81,11 @@ def _record(h) -> dict:
         "statement_then": g("statement_then"),
         "statement_because": g("statement_because"),
         "experiment": g("experiment"),
+        "roadmap": list(g("roadmap", []) or []),         # лаборатория→пилот→внедрение
         "evidence": list(g("evidence", []) or []),
         "sources": list(g("sources", []) or []),
         "violates_constraints": list(g("violates_constraints", []) or []),
+        "literature": list(g("literature", []) or []),   # цитаты из выданного корпуса
         "world_practice": g("world_practice", None),
         "expert_feedback": g("expert_feedback", None),   # вердикт из feedback.json (если был)
         "metrics": dict(g("metrics", {}) or {}),
@@ -156,6 +158,9 @@ def _task_description(r: dict, meta: dict) -> str:
         f"Потенциал: адресует {round(m.get('impact', 0)*100)}% извлекаемых потерь "
         f"{r['target_element']} по фабрике {meta['fabric']} (не проверено экспериментально).",
         f"Эксперимент: {r['experiment']}",
+        "Дорожная карта: " + " → ".join(
+            f"{s['stage']}) {s['name']} (критерий: {s['success']})"
+            for s in r.get("roadmap", [])),
         "Заземление: " + "; ".join(f"{e.get('label','')} [{e.get('cell','')}]"
                                     for e in r["evidence"]),
         "Источники метода: " + "; ".join(r["sources"]),
@@ -310,9 +315,15 @@ def write_pdf(data: dict, path: str) -> str:
             P(f"⚠ нарушает ограничение запроса: {E('; '.join(r['violates_constraints']))} "
               f"— приоритет занижен, гипотеза не скрыта", "small")
         P(f"<b>Эксперимент:</b> {E(r['experiment'])}")
+        for s in r.get("roadmap", []):
+            P(f"<b>Этап {s['stage']} — {E(s['name'])}:</b> {E(s['actions'])} · "
+              f"<b>критерий перехода:</b> {E(s['success'])}", "small")
         ev = "; ".join(f"{e.get('label','')} [{e.get('cell','')}]" for e in r["evidence"])
         P(f"<b>Заземление (ячейки отчёта):</b> {E(ev)}", "small")
         P(f"<b>Источники метода:</b> {E('; '.join(r['sources']))}", "small")
+        for lq in r.get("literature", []):
+            P(f"<b>База знаний:</b> «{E(lq.get('quote',''))}» "
+              f"[{E(lq.get('locator') or lq.get('source') or '')}]", "small")
         wp = r.get("world_practice")
         if isinstance(wp, dict) and wp.get("url"):
             P(f"<b>Мировая практика:</b> {E(wp.get('practice',''))} — «{E(wp.get('quote',''))}» "
@@ -399,9 +410,17 @@ def write_docx(data: dict, path: str) -> str:
                               False, 18, MUTED)], after=40))
         body.append(_dp([("Эксперимент: ", True, None, None),
                          (r["experiment"], False, None, None)], after=40))
+        for s in r.get("roadmap", []):
+            body.append(_dp([(f"Этап {s['stage']} — {s['name']}: ", True, 18, TEAL),
+                             (f"{s['actions']} · критерий перехода: {s['success']}",
+                              False, 18, MUTED)], after=30))
         ev = "; ".join(f"{e.get('label','')} [{e.get('cell','')}]" for e in r["evidence"])
         body.append(_dp([(f"Заземление: {ev} · Источники: {'; '.join(r['sources'])}",
                           False, 18, MUTED)]))
+        for lq in r.get("literature", []):
+            body.append(_dp([(f"База знаний: «{lq.get('quote','')}» "
+                              f"[{lq.get('locator') or lq.get('source') or ''}]",
+                              False, 18, MUTED)], after=30))
         wp = r.get("world_practice")
         if isinstance(wp, dict) and wp.get("url"):
             body.append(_dp([(f"Мировая практика: {wp.get('practice','')} — "

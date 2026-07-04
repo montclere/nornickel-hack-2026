@@ -151,6 +151,7 @@ def main():
 
     # --- ветка 1: детерминированная диагностика хвостов ---
     all_hyps = []
+    fabric_results = []   # (profile, res, путь HTML) — для дообогащения после извлечения
     if tailings and skip_branch_a:
         print(f"\nдиагностика хвостов пропущена: элемента «{intent.requested_element}» "
               f"нет в отчётах — работает только ветка Б (литература).")
@@ -177,6 +178,7 @@ def main():
             out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
             open(out, "w", encoding="utf-8").write(res["html"])
             reports.append(out)
+            fabric_results.append((p, res, out))
             top = hyps[0] if hyps else None
             print(f"  {p.fabric}: {len(hyps)} гипотез, топ — "
                   f"{top.statement_if if top else '—'}  [{out}]")
@@ -230,6 +232,21 @@ def main():
             os.makedirs(OUTPUTS_DIR, exist_ok=True)
             rels = extract_relations(chunks, llm=llm, max_chunks=args.max_chunks,
                                      query=query, cache_path=cache, log=lambda m: print("  " + m))
+            # свежие связи корпуса → подкрепить карточки ветки А цитатами литературы (с
+            # локатором до страницы) и пересобрать их HTML: при прогоне «с нуля» кэша ещё
+            # не было, когда ветка А рисовала отчёты (см. litsupport.py товарища)
+            if rels and fabric_results:
+                from factory.litsupport import enrich as lit_enrich
+                from factory.report import render
+                for p, res, out in fabric_results:
+                    n = lit_enrich(res["hypotheses"], rels)
+                    if n:
+                        open(out, "w", encoding="utf-8").write(
+                            render(p, res["graph"].to_layered(), res["hypotheses"],
+                                   kpi=args.kpi, tech=res.get("tech"),
+                                   analysis=res.get("analysis"), runinfo=runinfo))
+                        print(f"  {p.fabric}: {n} карточек подкреплены цитатами корпуса "
+                              f"(HTML пересобран)")
             kg = RelationGraph(rels)
             print(f"канонический граф: {kg.stats()}")
             found = discover(kg, kpi=query, limit=8)

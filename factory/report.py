@@ -160,8 +160,10 @@ def _card(h, runinfo=None):
         <div class="exprow"><span>метрика</span><p>{_esc(h.exp_metric)}</p></div>
         <div class="exprow"><span>критерий</span><p>{_esc(h.exp_criterion)}</p></div>
       </div>
+      {_roadmap_html(getattr(h, "roadmap", None))}
       <div class="evidence"><b>Заземление — ячейки отчёта (клик открывает файл):</b>{ev}</div>
       <div class="src"><b>Основание метода (правило диагностики):</b><ul>{src}</ul></div>
+      {_literature_html(getattr(h, "literature", None))}
       <div class="wp"><b>Мировая практика:</b>{wp}</div>
       {_dossier_html(getattr(h, "dossier", None), runinfo.get("dossier"))}
     </article>"""
@@ -186,6 +188,31 @@ def _dossier_html(dossier, searched=None):
         for e in dossier)
     return (f'<div class="dos"><b>Доказательная база ({len(dossier)} источн., OpenAlex):</b>'
             f'{items}</div>')
+
+
+def _literature_html(lit):
+    """Подтверждение из ВЫДАННОГО корпуса: дословные цитаты с локатором до страницы
+    (подбирает litsupport.py детерминированно по кэшу извлечения). Нет цитат — блока нет."""
+    if not lit:
+        return ""
+    qs = "".join(
+        f'<blockquote class="litq">«{_esc(e["quote"])}»'
+        f'<span class="litloc">{_esc(e.get("locator") or e.get("source") or "")}</span>'
+        f'</blockquote>' for e in lit)
+    return f'<div class="lit"><b>Подтверждение из базы знаний (выданный корпус):</b>{qs}</div>'
+
+
+def _roadmap_html(rm):
+    """Дорожная карта эксперимента: этапы лаборатория→пилот→внедрение с критериями
+    перехода (го/стоп). Строится детерминированным шаблоном в roadmap.py."""
+    if not rm:
+        return ""
+    steps = "".join(
+        f'<li><b>{_esc(s["name"])}.</b> {_esc(s["actions"])}'
+        f'<span class="crit">критерий перехода: {_esc(s["success"])}</span></li>'
+        for s in rm)
+    return (f'<div class="rm"><b>Дорожная карта эксперимента:</b>'
+            f'<ol>{steps}</ol></div>')
 
 
 def _world_practice_html(wp, searched=None):
@@ -445,12 +472,21 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .exprow span{{flex:0 0 62px;text-align:right;font-size:10px;font-weight:700;letter-spacing:.4px;
   text-transform:uppercase;color:#9db3bf}}
 .exprow p{{margin:0;font-size:13px}}
+.rm{{font-size:13px;margin:10px 0;background:#f6fbfd;border:1px solid var(--line);
+  border-radius:10px;padding:10px 14px}}
+.rm>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.rm ol{{margin:6px 0 0;padding-left:20px}} .rm li{{margin:0 0 8px}}
+.rm .crit{{display:block;margin-top:2px;font-size:12px;color:#0a7f79}}
 .src{{font-size:12px;margin:10px 0}} .src b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .src ul{{margin:5px 0 0;padding-left:18px;color:#37505c}} .src li{{margin:2px 0}}
 .wp{{font-size:12px;margin:10px 0}} .wp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .wp p{{margin:4px 0 0}} .wp code{{background:#eef4f7;padding:1px 4px;border-radius:3px}}
 .wpq{{margin:6px 0 4px;padding:6px 10px;border-left:3px solid #12b3ab;background:#f2fbfa;
   color:#2a4550;font-size:12.5px;overflow-wrap:anywhere}}
+.lit{{font-size:12px;margin:10px 0}} .lit>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.litq{{margin:6px 0 4px;padding:6px 10px;border-left:3px solid #1f7ae0;background:#f4f9fe;
+  color:#2a4550;font-size:12.5px;overflow-wrap:anywhere}}
+.litloc{{display:block;margin-top:3px;color:#9db3bf;font-size:11px}}
 .wpsrc{{font-size:11px;color:#9db3bf}} .wpsrc a{{color:#1f7ae0;text-decoration:none}}
 .dos{{font-size:12px;margin:10px 0}} .dos>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .dos code{{background:#eef4f7;padding:1px 4px;border-radius:3px}}
