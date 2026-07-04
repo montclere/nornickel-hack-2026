@@ -14,8 +14,9 @@
   <div class="himpact big">{{ (h.metrics.impact * 100) | round | int }}%<span>потерь {{ h.target_element }}</span></div>
 </div>
 
-{% if h.violates_constraints %}<div class="warn">нарушает ограничение: {{ h.violates_constraints|join(', ') }}
-  — приоритет занижен, гипотеза не скрыта</div>{% endif %}
+{% if h.violates_constraints %}<div class="warn">конфликт с ограничением «{{ h.violates_constraints|join('», «') }}»
+  — приоритет умножен на 0.1 (гипотеза опущена в списке, но не скрыта: ограничения
+  бывают переговорными, решение за экспертом)</div>{% endif %}
 {% if h.expert_feedback %}<div class="fb">фидбэк эксперта: <b>{{ h.expert_feedback.verdict }}</b>
   {% if h.expert_feedback.note %}— «{{ h.expert_feedback.note }}»{% endif %}
   · приоритет ×{{ h.expert_feedback.multiplier }}</div>{% endif %}

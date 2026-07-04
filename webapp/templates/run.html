@@ -15,14 +15,31 @@
     {% if els %}<div class="rh-badge el"><b>{{ els|join(', ') }}</b><span>{{ 'целевые элементы' if els|length > 1 else 'целевой элемент' }}{% if not result.element_in_schema %} · вне схемы{% endif %}</span></div>{% endif %}
     <div class="rh-badge"><b>{{ nh }}</b><span>гипотез</span></div>
   </div>
-  {% if result.get('constraints') %}
+  {% if result.get('constraints') or result.get('constraints_unrecognized') %}
   <div class="rh-meta">
     <span class="rh-conslabel">ограничения:</span>
-    {% for c in result.constraints %}<span class="chip warn-chip">{{ c }}</span>{% endfor %}
+    {% for c in result.constraints %}
+      {% if c is mapping %}{% set hard = c.kind in ('equipment', 'reagent') %}
+        <span class="chip {{ 'cons-hard' if hard else 'cons-soft' }}"
+              title="{{ 'жёсткое: приоритет конфликтующих гипотез ×0.1, на карточке — пометка (гипотеза не скрывается)' if hard
+                        else 'пожелание: фиксируется и входит в критерии пилота, приоритет не меняет' }}">
+          {{ c.tag }}{{ ' · штрафует' if hard else ' · пожелание' }}</span>
+      {% else %}<span class="chip warn-chip">{{ c }}</span>{% endif %}
+    {% endfor %}
+    {% if result.get('constraints_unrecognized') %}
+      <span class="chip cons-miss" title="этой формулировки нет в словаре ограничений — она НЕ влияет на ранжирование. Точно распознаются: без нового оборудования, без новых реагентов, без реагента <имя>, сохранить качество, сохранить производительность">
+        «{{ result.constraints_text }}» — не распознано, не влияет</span>
+    {% endif %}
   </div>
   {% endif %}
 </div>
 {% for w in result.warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+{% if result.fabrics %}{% set allh = result.fabrics|map(attribute='hypotheses')|sum(start=[]) %}
+{% if allh and (allh|selectattr('violates_constraints')|list|length) == (allh|length) %}
+<div class="warn">Все гипотезы конфликтуют с заданным ограничением — по данным этой фабрики
+  без него не обойтись. Порядок внутри списка сохранён; возможно, ограничение стоит
+  обсудить как переговорное.</div>
+{% endif %}{% endif %}
 
 <!-- ═══ ИНФОРМАЦИЯ: конфиг (фиксирован) + материалы (сворачиваемо) ═══ -->
 <section class="info-block">

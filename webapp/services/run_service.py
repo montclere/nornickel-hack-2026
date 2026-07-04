@@ -134,7 +134,10 @@ class RunService:
                   "target_element": intent.target_element,
                   "element_in_schema": intent.element_in_schema,
                   "direction": intent.direction,
-                  "constraints": intent.matched_constraints,
+                  # [{tag, kind}] — kind решает влияние на ранжирование (см. run.html);
+                  # плюс честный флаг: текст ограничений введён, но словарь его не узнал
+                  "constraints": intent.constraints,
+                  "constraints_unrecognized": bool(constraints) and not intent.constraints,
                   "warnings": warns, "fabrics": []}
         for p, hyps, html_name in fabrics:
             data = serialize(hyps, profile=p, kpi=kpi)

@@ -452,3 +452,8 @@ a.qmark{text-decoration:none} a.qmark:hover{text-decoration:none}
 .litlist li:first-child{border-top:none}
 .lit-loc{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--faint);margin-bottom:4px}
 .litlist .q{margin:0}
+
+/* чипы ограничений: жёсткое (штрафует) / пожелание / не распознано */
+.cons-hard{color:var(--warn-ink);background:var(--warn-bg);border:1px solid var(--warn-line);cursor:help}
+.cons-soft{color:var(--muted);background:var(--surface);border:1px solid var(--line);cursor:help}
+.cons-miss{color:var(--faint);background:var(--surface);border:1px dashed var(--line);cursor:help;font-style:italic}
