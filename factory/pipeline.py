@@ -66,6 +66,10 @@ def main():
     ap.add_argument("--schema", default="", help="путь к JSON-схеме формата отчёта "
                     "(по умолчанию — известный формат; см. schema.py/schema_bootstrap.py)")
     ap.add_argument("--out", default="", help="куда сохранить HTML (по умолчанию рядом)")
+    ap.add_argument("--export", default="", metavar="ФОРМАТЫ",
+                    help="дополнительно выгрузить гипотезы: all либо через запятую из "
+                    "{json,csv,tasks,pdf,docx} (детерминированно, без LLM; "
+                    "см. factory/export.py)")
     args = ap.parse_args()
 
     if not os.path.exists(args.report):
@@ -114,6 +118,7 @@ def main():
 
     if args.out:
         out = args.out
+        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)  # --out в новую папку — не падать
     else:
         os.makedirs(OUTPUTS_DIR, exist_ok=True)
         out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
@@ -121,6 +126,12 @@ def main():
     from factory.glossary import write as write_glossary
     write_glossary(os.path.dirname(out) or ".")   # glossary.html рядом (ссылка из отчёта)
     print(f"HTML-отчёт с графом: {out}  (+ glossary.html рядом)")
+
+    if args.export:
+        from factory.export import export_all
+        print("\nЭКСПОРТ (те же гипотезы, что в HTML — единый слой serialize):")
+        export_all(hyps, profile=p, kpi=args.kpi, formats=args.export,
+                   out_dir=os.path.dirname(out) or OUTPUTS_DIR, log=print)
 
 
 if __name__ == "__main__":
