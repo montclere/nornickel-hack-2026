@@ -17,7 +17,7 @@ router = APIRouter(tags=["files"])
 def get_source(run_id: str, path: str):
     p = storage.resolve_source(run_id, path)
     if p is None:
-        raise HTTPException(404, "исходник не найден или путь вне песочницы прогона")
+        raise HTTPException(404, "файл не найден")
     # inline: браузер откроет PDF/картинку прямо во вкладке (на #page=N — на нужном месте).
     # content_disposition_type сам корректно кодирует кириллическое имя (RFC 5987).
     return FileResponse(p, content_disposition_type="inline")

@@ -51,7 +51,7 @@
 {% endif %}
 
 <div class="block">
-  <h3>Заземление — ячейки отчёта</h3>
+  <h3>Данные из отчёта</h3>
   <ul class="ev">
     {% for e in h.evidence %}
     <li>{{ e.label }} —
@@ -65,7 +65,7 @@
 
 {% if h.literature %}
 <div class="block">
-  <h3>Подтверждение из выданного корпуса</h3>
+  <h3>Из базы знаний</h3>
   {% for lq in h.literature %}
   <blockquote class="q">«{{ lq.quote }}»<span class="loc">{{ lq.locator or lq.source }}</span></blockquote>
   {% endfor %}
@@ -83,7 +83,7 @@
 
 {% if h.dossier %}
 <div class="block">
-  <h3>Доказательная база (OpenAlex)</h3>
+  <h3>Научные статьи</h3>
   {% for d in h.dossier %}
   <div class="dosrc">
     <div><span class="cit">{{ d.cited_by }} цит.</span>
@@ -95,6 +95,5 @@
 </div>
 {% endif %}
 
-<div class="muted small">Каждое число — из ячейки отчёта. Приоритет — наша эвристическая
-  свёртка (формула в глоссарии), масштаб (impact) ведёт.</div>
+<div class="muted small">Все числа взяты из ячеек загруженного отчёта; как считается приоритет — в глоссарии.</div>
 {% endblock %}

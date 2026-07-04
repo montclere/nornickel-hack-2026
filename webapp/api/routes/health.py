@@ -28,7 +28,7 @@ def health(llm: LLMClient = Depends(get_llm), search: SearchClient = Depends(get
             ocr_ok = bool(o.ready and o.probe())
     except Exception:  # noqa: BLE001
         ocr_ok = False
-    note = ("детерминированные ветки (хвосты, досье OpenAlex, веб-практики) работают без "
-            "LLM; ветка Б (литература) и полировка требуют LLM")
+    note = ("анализ отчётов, научные статьи и поиск в интернете работают без ключа; "
+            "ключ Yandex нужен для чтения литературы и распознавания сканов")
     return Health(ok=True, llm=llm_ok, ocr=ocr_ok, search_backend=search.name,
                   search_available=bool(getattr(search, "available", True)), note=note)

@@ -77,5 +77,5 @@ def run_status(run_id: str):
     if st is None:
         if storage.run_exists(run_id):
             return {"current": "готово", "done": True, "redirect": f"/runs/{run_id}"}
-        raise HTTPException(404, "прогон не найден")
+        raise HTTPException(404, "запуск не найден")
     return st

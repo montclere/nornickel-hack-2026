@@ -86,7 +86,7 @@
     const kpi = document.getElementById("kpi").value.trim();
     if (!kpi) { statusEl.textContent = "укажите цель (KPI)"; statusEl.className = "status err"; return; }
     if (!zoneFiles.data.length && !zoneFiles.knowledge.length) {
-      statusEl.textContent = "добавьте хотя бы один файл или папку (данные и/или знания)";
+      statusEl.textContent = "добавьте хотя бы один файл или папку";
       statusEl.className = "status err"; return;
     }
     const constraints = document.getElementById("constraints").value.trim();
@@ -98,7 +98,7 @@
     zoneFiles.knowledge.forEach(f => fd.append("knowledge_files", f, f.name));
 
     go.disabled = true; statusEl.className = "status busy";
-    statusEl.textContent = "идёт прогон — детерминированные ветки + обогащение (может занять минуты)…";
+    statusEl.textContent = "анализируем данные — может занять пару минут…";
     try {
       const r = await fetch("/api/runs", { method: "POST", body: fd });
       if (!r.ok) { const t = await r.json().catch(() => ({})); throw new Error(t.detail || `ошибка ${r.status}`); }

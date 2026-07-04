@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Прогон {{ run_id }}{% endblock %}
+{% block title %}Результаты · {{ run_id }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="/">← новый прогон</a></div>
+<div class="crumbs"><a href="/">← новый запуск</a></div>
 <h1>Гипотезы</h1>
 <div class="kpi-bar"><b>KPI</b> {{ result.kpi }}
   {% if result.target_element %}<span class="chip">элемент: {{ result.target_element }}
@@ -22,7 +22,7 @@
     <h2>{{ m.fabric }} <span class="src">источник: {{ m.source }}</span></h2>
     <div class="fmeta">
       {% for sym, t in m.recoverable_tonnes_total.items() %}<span>{{ t }} т {{ sym }} извлек.</span>{% endfor %}
-      <span>топ-3 адресуют ~{{ m.kpi_potential_top3_pct }}% потерь</span>
+      <span>топ-3 покрывают ~{{ m.kpi_potential_top3_pct }}% потерь</span>
       <span>{{ fabric.hypotheses|length }} гипотез</span>
     </div>
     <div class="grid">
@@ -50,7 +50,7 @@
 
 {% if metrics and metrics.total and metrics.total.calls %}
 <div class="metrics">
-  <b>Метрики прогона:</b> {{ metrics.total.calls }} внешних вызовов ·
+  <b>Технические детали:</b> {{ metrics.total.calls }} внешних вызовов ·
   {{ metrics.total.retries }} ретраев · {{ metrics.total.errors }} ошибок ·
   токены LLM {{ metrics.total.tokens_in }}→{{ metrics.total.tokens_out }} ·
   {{ metrics.wall_seconds }} c

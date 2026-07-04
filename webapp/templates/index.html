@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Фабрика гипотез · загрузка{% endblock %}
 {% block content %}
-<h1>Новый прогон</h1>
-<p class="sub">Загрузите материалы, задайте цель — получите ранжированные проверяемые гипотезы
-с обоснованием до ячейки и источниками.</p>
+<h1>Поиск гипотез</h1>
+<p class="sub">Загрузите материалы и задайте цель — получите проверяемые гипотезы
+с обоснованием и источниками.</p>
 
 <form id="run-form" class="card-form">
   <div class="dropzones">
@@ -11,8 +11,8 @@
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
            stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/>
         <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-      <div class="dz-title">Данные фабрики <span>(state)</span></div>
-      <div class="dz-hint">хвосты <code>.xlsx</code>, схемы/регламенты этой фабрики. Наружу не уходят.</div>
+      <div class="dz-title">Данные фабрики</div>
+      <div class="dz-hint">отчёт по хвостам (<code>.xlsx</code>), схемы и регламенты фабрики</div>
       <input type="file" class="dz-input" multiple
              accept=".xlsx,.csv,.pdf,.docx,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp">
       <ul class="dz-list"></ul>
@@ -21,8 +21,8 @@
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
            stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>
         <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
-      <div class="dz-title">Знания <span>(reference)</span></div>
-      <div class="dz-hint">учебники, статьи, типовые схемы/регламенты — общее знание домена.</div>
+      <div class="dz-title">Литература</div>
+      <div class="dz-hint">справочники, статьи, методички</div>
       <input type="file" class="dz-input" multiple
              accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp">
       <ul class="dz-list"></ul>
@@ -38,13 +38,12 @@
     <span>Ограничения <em>(опционально)</em></span>
     <input type="text" id="constraints"
            placeholder="например: без нового оборудования">
-    <small>«без нового оборудования» учитывается детерминированно (штраф + пометка);
-      сложные свободные ограничения — LLM-трек.</small>
+    <small>распознанные ограничения помечаются на карточках гипотез</small>
   </label>
 
   <div class="flags">
-    <label><input type="checkbox" id="dossier" checked> досье OpenAlex (статьи + цитируемость, без ключа)</label>
-    <label><input type="checkbox" id="web"> веб-практики (RU-соседи + мир; best-effort)</label>
+    <label><input type="checkbox" id="dossier" checked> Научные статьи</label>
+    <label><input type="checkbox" id="web"> Поиск в интернете</label>
   </div>
 
   <button type="submit" id="go">Построить гипотезы</button>
@@ -52,7 +51,7 @@
 </form>
 
 {% if runs %}
-<h2 class="mt">Недавние прогоны</h2>
+<h2 class="mt">Предыдущие запуски</h2>
 <ul class="runs">
   {% for r in runs %}
   <li><a href="/runs/{{ r.run_id }}">{{ r.run_id }}</a>

@@ -24,7 +24,7 @@ def index(request: Request):
 @router.get("/runs/{run_id}", response_class=HTMLResponse)
 def run_page(request: Request, run_id: str, rs=Depends(get_report_service)):
     if not storage.run_exists(run_id):
-        raise HTTPException(404, "прогон не найден")
+        raise HTTPException(404, "запуск не найден")
     result = rs.result(run_id) or {"fabrics": [], "reports": []}
     return TEMPLATES.TemplateResponse(request, "run.html", {
         "run_id": run_id, "result": result,
