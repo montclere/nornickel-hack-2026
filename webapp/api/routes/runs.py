@@ -55,6 +55,7 @@ async def create_run(
     max_chunks: int = Form(settings.DEFAULT_MAX_CHUNKS),
     data_files: list[UploadFile] = File(default=[]),
     knowledge_files: list[UploadFile] = File(default=[]),
+    schemes_files: list[UploadFile] = File(default=[]),
     llm: LLMClient = Depends(get_llm),
     search: SearchClient = Depends(get_search),
 ):
@@ -67,6 +68,7 @@ async def create_run(
     run_id = storage.new_run_id()
     await uploads.save_group(run_id, data_files, "data")
     await uploads.save_group(run_id, knowledge_files, "knowledge")
+    await uploads.save_group(run_id, schemes_files, "schemes")
     if not any((storage.run_dir(run_id) / "sources").rglob("*")):
         raise HTTPException(422, "материалы не загружены — добавьте файл или папку")
 

@@ -19,14 +19,19 @@ def _safe_rel(name: str) -> str:
     return "/".join(parts) or "file"
 
 
+# роль загрузки → подпапка в sources/. Схемы кладём ВНУТРЬ data («данные фабрики»):
+# ingest по имени папки даст им роль state, а OCR-ветка подхватит картинки как сканы
+_ROLE_DIRS = {"data": "data", "knowledge": "knowledge", "schemes": "data/схемы"}
+
+
 async def save_group(run_id: str, files, role: str) -> list:
-    """Сохранить группу файлов под sources/<role>/. role ∈ {data, knowledge}.
-    Возвращает список относительных путей (от sources/)."""
-    if role not in ("data", "knowledge"):
+    """Сохранить группу файлов под sources/<подпапка роли>/. role ∈ {data, knowledge,
+    schemes}. Возвращает список относительных путей (от sources/)."""
+    if role not in _ROLE_DIRS:
         raise UploadError(f"неизвестная роль загрузки: {role}")
     from webapp.infra import storage
     storage.ensure_run(run_id)
-    base = storage.run_dir(run_id) / "sources" / role
+    base = storage.run_dir(run_id) / "sources" / _ROLE_DIRS[role]
     saved = []
     for f in files or []:
         if not getattr(f, "filename", ""):
@@ -38,5 +43,5 @@ async def save_group(run_id: str, files, role: str) -> list:
         dest = base / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
-        saved.append(f"{role}/{rel}")
+        saved.append(f"{_ROLE_DIRS[role]}/{rel}")
     return saved

@@ -12,12 +12,16 @@
         `<span class="dot" title="${ok ? "доступен" : "недоступен"}">${name} <i class="${ok ? "ok" : "no"}"></i></span>`;
       hEl.innerHTML = dot(h.llm, "LLM") + dot(h.ocr, "OCR") + `<span class="dot">поиск: ${h.search_backend}</span>`;
       hEl.title = h.note;
+      // распознавание сканов недоступно → честно предупредить в зоне схем
+      const sw = document.getElementById("schemes-warn");
+      if (sw && !h.ocr) sw.textContent =
+        "распознавание сканов сейчас недоступно (нет ключа OCR) — схемы будут пропущены";
     }).catch(() => { hEl.textContent = ""; });
   }
 
   const form = document.getElementById("run-form");
   if (!form) return;
-  const zoneFiles = { data: [], knowledge: [] };
+  const zoneFiles = { data: [], knowledge: [], schemes: [] };
 
   // рекурсивно вычитать FileSystemEntry (файл или ПАПКА со всем содержимым)
   function readEntry(entry, out) {
@@ -87,7 +91,7 @@
     e.preventDefault();
     const kpi = document.getElementById("kpi").value.trim();
     if (!kpi) { statusEl.textContent = "укажите цель (KPI)"; statusEl.className = "status err"; return; }
-    if (!zoneFiles.data.length && !zoneFiles.knowledge.length) {
+    if (!zoneFiles.data.length && !zoneFiles.knowledge.length && !zoneFiles.schemes.length) {
       statusEl.textContent = "добавьте хотя бы один файл или папку";
       statusEl.className = "status err"; return;
     }
@@ -99,6 +103,7 @@
     fd.append("max_chunks", document.getElementById("max_chunks").value || "14");
     zoneFiles.data.forEach(f => fd.append("data_files", f, f.name));
     zoneFiles.knowledge.forEach(f => fd.append("knowledge_files", f, f.name));
+    zoneFiles.schemes.forEach(f => fd.append("schemes_files", f, f.name));
 
     go.disabled = true; statusEl.className = "status busy";
     statusEl.textContent = "загружаем файлы…";
