@@ -190,6 +190,17 @@ uv run python -m factory.evaluate "materials/data/fabrics/ТОФ/Хвосты Т
 uv run python -m factory.benchmark --no-judge [materials/data/fabrics]
 ```
 
+**Батч-прогон НАБОРА KPI** (под held-out список проверяющих): файл с KPI по одному
+на строку × все фабрики → экспорт по каждому KPI + сводка `сводка.csv`/`сводка.json`:
+```bash
+uv run python -m factory.batch kpi_list.txt materials/fabrics \
+  [--formats json,csv] [--html] [--schema файл.json] [--out-dir outputs/batch]
+```
+KPI с элементом вне схемы отчёта (напр. платина в Cu-Ni) честно помечается в сводке
+«элемент вне схемы», а не подменяется дефолтом; битый файл отчёта не роняет батч —
+строка «ошибка» в сводке. Ветка Б в батч не входит (её извлечение требует LLM-вызова
+на каждый KPI) — точечно через `factory.flex`.
+
 ### Требуют ключ Yandex (LLM-ветка)
 
 **1. Гибкий приём — сначала это.** Диагностирует хвосты (детерминированно) И извлекает
@@ -336,7 +347,7 @@ factory/
   schema.py schema_bootstrap.py intent.py               ← конфиг формата + разбор KPI (без LLM в ядре)
   ingest.py extract.py kgraph.py discover.py flex.py report_kb.py  ← гибкая ветка (текст → граф → открытие → HTML)
   reader.py analysis.py rules.py metrics.py generator.py pipeline.py  ← детерминированная ветка (хвосты)
-  export.py feedback.py                                  ← экспорт (PDF/DOCX/CSV/JSON/Jira) + фидбэк-цикл эксперта
+  export.py feedback.py batch.py                         ← экспорт (PDF/DOCX/CSV/JSON/Jira) + фидбэк-цикл + батч по набору KPI
   config.py llm.py report.py glossary.py evaluate.py benchmark.py judge.py docs/build_guide.py
 materials/   fabrics/<Ф>/ (Хвосты+Гипотезы) · reference/ (books/schemes/regulations)   [вне git]
 outputs/     HTML-отчёты, kb_cache.json, judge_cache.json, feedback.json, schemas/     [вне git]
