@@ -27,8 +27,8 @@ import urllib.request
 from dataclasses import asdict, dataclass
 
 from factory.config import (WEB_CACHE, WEB_FETCH_TIMEOUT, WEB_INDUSTRIAL_DOMAINS,
-                            WEB_MAX_HYPS, WEB_MAX_RESULTS, WEB_PAGE_CHARS,
-                            WEB_SEARCH_ENABLED)
+                            WEB_MAX_HYPS, WEB_MAX_RESULTS, WEB_MIN_QUOTE_CHARS,
+                            WEB_MIN_QUOTE_WORDS, WEB_PAGE_CHARS, WEB_SEARCH_ENABLED)
 from factory.llm import Yandex, extract_json
 
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -96,6 +96,75 @@ def _strip_html(doc: str, limit=WEB_PAGE_CHARS) -> str:
     return text[:limit]
 
 
+# ---------- контент страницы: тело без обвязки (фикс «цитаты-заголовки») ----------
+# Раньше в LLM уходили первые N символов страницы «как есть» — то есть title, меню,
+# навигация и cookie-баннеры. Модель честно выбирала «цитату» из этого мусора —
+# получался заголовок страницы: он дословно есть на странице (гейт проходил), но
+# ничего не подтверждает. Теперь: (1) обвязка вырезается, (2) текст режется на
+# СОДЕРЖАТЕЛЬНЫЕ абзацы, (3) в LLM идут абзацы, релевантные вмешательству,
+# (4) после LLM цитата проходит детерминированный гейт КАЧЕСТВА (не заголовок).
+
+_DROP_TAGS = ("script", "style", "noscript", "head", "header", "footer", "nav",
+              "aside", "form", "svg", "button", "select")
+
+
+def _page_content(doc: str) -> tuple:
+    """HTML → (title, [содержательные абзацы тела]). Заголовки/пункты меню короче
+    порога отсеиваются — из них нельзя брать цитату-доказательство."""
+    m = re.search(r"(?is)<title[^>]*>(.*?)</title>", doc)
+    title = re.sub(r"\s+", " ", html.unescape(m.group(1))).strip() if m else ""
+    for t in _DROP_TAGS:
+        doc = re.sub(rf"(?is)<{t}[^>]*>.*?</{t}>", " ", doc)
+    # граница абзаца — только КОНЕЦ БЛОЧНОГО ТЕГА (маркер \x00), а не переносы строк
+    # в исходнике: иначе <p> с переносами внутри развалится на фрагменты-«абзацы»
+    doc = re.sub(r"(?is)<br\s*/?>|</p>|</div>|</li>|</h[1-6]>|</tr>|</section>|</article>",
+                 "\x00", doc)
+    text = html.unescape(re.sub(r"(?s)<[^>]+>", " ", doc))
+    paras = []
+    for block in text.split("\x00"):
+        p = re.sub(r"\s+", " ", block).strip()   # схлопнуть и пробелы, и переносы
+        # абзац «содержательный»: достаточно длинный и в основном из букв
+        if len(p) >= 60 and sum(ch.isalpha() for ch in p) / len(p) >= 0.5:
+            paras.append(p)
+    return title, paras
+
+
+def _tok(s: str) -> set:
+    return set(re.findall(r"[а-яёa-z0-9]{3,}", (s or "").lower()))
+
+
+def _relevant_excerpt(paras: list, qtokens: set, limit=WEB_PAGE_CHARS) -> str:
+    """Собрать для LLM выжимку из абзацев, РЕЛЕВАНТНЫХ запросу (пересечение токенов),
+    в исходном порядке — а не первые N символов страницы, где живёт обвязка."""
+    scored = sorted(((len(_tok(p) & qtokens), i) for i, p in enumerate(paras)),
+                    key=lambda t: (-t[0], t[1]))
+    picked, total = [], 0
+    for _, i in scored:
+        if total >= limit:
+            break
+        picked.append(i); total += len(paras[i]) + 1
+    return "\n".join(paras[i] for i in sorted(picked))[:limit]
+
+
+def _quote_quality(quote: str, title: str, paras: list) -> bool:
+    """Цитата — предложение из ОСНОВНОГО текста, а не заголовок/название страницы.
+    Детерминированные признаки, поверх дословного гейта:
+      • минимум длины и слов (заголовки короткие);
+      • не совпадает с <title> страницы (в обе стороны, по канон-форме);
+      • абзац-носитель заметно длиннее самой цитаты (иначе это строка-заголовок)."""
+    if len(quote) < WEB_MIN_QUOTE_CHARS:
+        return False
+    if len(re.findall(r"[а-яёa-z0-9]+", quote.lower())) < WEB_MIN_QUOTE_WORDS:
+        return False
+    cq, ct = _canon(quote), _canon(title)
+    if ct and (cq in ct or ct in cq):
+        return False
+    host = next((p for p in paras if cq in _canon(p)), None)
+    if host is not None and len(host) < max(len(quote) + 40, 160):
+        return False
+    return True
+
+
 # ---------- поиск (DuckDuckGo HTML, без ключа) ----------
 
 def _search_ddg(query: str, n: int, timeout=WEB_FETCH_TIMEOUT) -> list:
@@ -137,8 +206,12 @@ class WebPractices:
               '{"found": true|false, "source": <номер>, '
               '"quote": "<дословная фраза из ЭТОГО источника, язык оригинала>", '
               '"practice": "<1-2 предложения по-русски: где и как применяют, результат>"}. '
-              "quote обязана дословно встречаться в тексте источника. Если ни один "
-              "источник не подтверждает промышленное применение — found=false.")
+              "ТРЕБОВАНИЯ К quote: это ПОЛНОЕ ПРЕДЛОЖЕНИЕ (или два) из основного текста, "
+              "минимум 10 слов, скопированное ДОСЛОВНО. Предложение само по себе должно "
+              "подтверждать промышленное применение (где / что сделали / результат). "
+              "ЗАПРЕЩЕНО брать в quote заголовок страницы, название статьи, пункт меню "
+              "или подпись ссылки — такая цитата будет отброшена автоматически. Если ни "
+              "один источник не подтверждает промышленное применение — found=false.")
 
     def __init__(self, llm=None, cache_path=WEB_CACHE, log=lambda *a: None):
         self.llm = llm or Yandex(temperature=0.0, max_tokens=800)
@@ -191,7 +264,9 @@ class WebPractices:
 
     def find(self, intervention: str, family: str = "", element: str = "",
              extra: str = "") -> WorldPractice | None:
-        key = self._key("v2", intervention, family, element, extra)
+        # v3: версия схемы кэша — поднята после ввода гейта качества цитат, чтобы
+        # закэшированные «цитаты-заголовки» из v2 не пережили фикс
+        key = self._key("v3", intervention, family, element, extra)
         if key in self._cache:
             c = self._cache[key]
             return WorldPractice(**c) if c else None
@@ -202,6 +277,8 @@ class WebPractices:
 
     def _find_uncached(self, intervention, family, element, extra):
         queries = self._queries(intervention, family, element, extra)
+        # токены запроса (RU+EN) — чтобы отдать LLM релевантные абзацы, а не шапку сайта
+        qtokens = _tok(" ".join([intervention, family, element, extra] + queries))
         pages, urls_seen = [], set()
         for q in queries:
             for url, _title in _search_ddg(q, WEB_MAX_RESULTS):
@@ -209,11 +286,12 @@ class WebPractices:
                     continue
                 urls_seen.add(url)
                 try:
-                    text = _strip_html(_get(url))
+                    title, paras = _page_content(_get(url))
                 except Exception:  # noqa: BLE001
                     continue
-                if len(text) >= 200:
-                    pages.append((url, text, q))
+                excerpt = _relevant_excerpt(paras, qtokens)
+                if len(excerpt) >= 200:                 # есть содержательное тело
+                    pages.append((url, title, paras, excerpt, q))
                 if len(pages) >= WEB_MAX_RESULTS:
                     break
             if len(pages) >= WEB_MAX_RESULTS:
@@ -222,7 +300,7 @@ class WebPractices:
             return None
 
         src_block = "\n\n".join(
-            f"[{i+1}] URL: {u}\n{t[:WEB_PAGE_CHARS]}" for i, (u, t, _q) in enumerate(pages))
+            f"[{i+1}] URL: {u}\n{ex}" for i, (u, _t, _p, ex, _q) in enumerate(pages))
         user = (f"Вмешательство: {intervention}\nСемейство: {family}\n"
                 f"Целевой элемент: {element}\n\nИсточники:\n{src_block}")
         try:
@@ -235,10 +313,12 @@ class WebPractices:
         idx = out.get("source")
         if not isinstance(idx, int) or not (1 <= idx <= len(pages)):
             return None
-        url, text, q = pages[idx - 1]
+        url, title, paras, _ex, q = pages[idx - 1]
         quote = (out.get("quote") or "").strip()
-        # ЦИТАТНЫЙ ГЕЙТ: дословная фраза обязана быть на странице (иначе — галлюцинация)
-        if len(quote) < 12 or not _quote_on_page(quote, text):
+        body = "\n".join(paras)
+        # ГЕЙТ 1 (дословность): фраза обязана быть в теле страницы — иначе галлюцинация.
+        # ГЕЙТ 2 (качество): фраза — предложение из текста, а не заголовок/название.
+        if not _quote_on_page(quote, body) or not _quote_quality(quote, title, paras):
             return None
         return WorldPractice(practice=(out.get("practice") or "").strip(), quote=quote,
                              url=url, site=_domain(url), query=q)

@@ -37,6 +37,15 @@ DEFAULT_CACHE = os.path.join(OUTPUTS_DIR, "kb_cache.json")
 # значения из настоящего явного запуска, с объявлением источника в выводе (см. runconfig.py)
 RUN_CONFIG_PATH = os.path.join(OUTPUTS_DIR, "last_run.json")
 
+# --- вторичная гипотеза класса (см. generator._secondary): доля извлекаемого
+# тоннажа класса в НЕдоминирующей форме, с которой генерируется второе направление
+# (напр. класс с доминирующим закрытым минералом, но заметной раскрытой долей →
+# помимо «доизмельчения» честно предложить и флотационное направление) ---
+# дефолт 0.30 подобран свипом по golden-бенчмарку: recall 27/27 = 100% (было 85%),
+# precision Примеров 1/4 остаётся 100% (0.20–0.25 дают тот же recall, но шире
+# задевают precision; 0.40 теряет recall Примера 3)
+SECONDARY_MIN_SHARE = float(os.environ.get("FACTORY_SECONDARY_SHARE", "0.30"))
+
 # --- фидбэк эксперта (см. feedback.py): человекочитаемая база вердиктов,
 # применяется детерминированным ре-ранком; FACTORY_FEEDBACK=0 — отключить ---
 FEEDBACK_PATH = os.environ.get("FACTORY_FEEDBACK_PATH",
@@ -75,6 +84,10 @@ WEB_MAX_RESULTS = int(os.environ.get("WEB_MAX_RESULTS", "6"))   # сколько
 WEB_MAX_HYPS = int(os.environ.get("WEB_MAX_HYPS", "5"))        # для скольких топ-гипотез искать
 WEB_FETCH_TIMEOUT = int(os.environ.get("WEB_FETCH_TIMEOUT", "12"))
 WEB_PAGE_CHARS = int(os.environ.get("WEB_PAGE_CHARS", "4000"))  # сколько текста страницы в LLM
+# гейт КАЧЕСТВА цитаты (поверх дословного гейта): цитата обязана быть предложением из
+# основного текста, а не заголовком/названием страницы — см. websearch._quote_quality
+WEB_MIN_QUOTE_CHARS = int(os.environ.get("WEB_MIN_QUOTE_CHARS", "60"))
+WEB_MIN_QUOTE_WORDS = int(os.environ.get("WEB_MIN_QUOTE_WORDS", "8"))
 WEB_CACHE = os.path.join(OUTPUTS_DIR, "web_cache.json")
 # промышленные/материаловедческие домены — их поднимаем в выдаче (сайты вроде MITS NIMS,
 # профильные журналы, вендоры оборудования). Переопределяется через env (запятыми).
