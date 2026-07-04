@@ -101,7 +101,9 @@ def _quotes_html(chain):
 
 def _card(i, d):
     kind_gap = bool(d.b)                          # b заполнен только у разрыва Свонсона
-    badges = ""
+    # происхождение честно помечается: связи извлёк LLM (не детерминированный парсер),
+    # каждая прошла цитатный гейт — дословная цитата обязана быть в источнике
+    badges = '<span class="tag llm" title="связь извлечена языковой моделью из текста; принята только потому, что дословная цитата найдена в источнике">LLM-извлечение · цитата проверена</span>'
     if d.is_action:
         badges += '<span class="tag act">промышленное действие → внедрить</span>'
     else:
@@ -178,6 +180,7 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .tag.gap{{color:#5b3fa8;background:#f1ecfc}}
 .tag.dir{{color:#1f7ae0;background:#eaf3fd}}
 .tag.st{{color:#a83f66;background:#fdeef4}}
+.tag.llm{{color:#5b3fa8;background:#f1ecfc;cursor:help}}
 .tri .row{{display:flex;gap:12px;align-items:baseline;margin:6px 0}}
 .lab{{flex:0 0 92px;text-align:right;font-size:10.5px;font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;color:var(--teal)}} .lab.because{{color:#9db3bf}}

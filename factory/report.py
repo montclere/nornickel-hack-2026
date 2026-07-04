@@ -202,7 +202,10 @@ def _literature_html(lit):
         f'<blockquote class="litq">«{_esc(e["quote"])}»'
         f'<span class="litloc">{_esc(e.get("locator") or e.get("source") or "")}</span>'
         f'</blockquote>' for e in lit)
-    return f'<div class="lit"><b>Из базы знаний</b>{qs}</div>'
+    return (f'<div class="lit"><b>Из базы знаний</b>'
+            f'<span class="llm-mark" title="выдержки нашла языковая модель при разборе '
+            f'загруженных материалов; дословность каждой цитаты проверена автоматически">'
+            f'LLM-разбор</span>{qs}</div>')
 
 
 def _roadmap_html(rm):
@@ -509,6 +512,8 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .litq{{margin:6px 0 4px;padding:6px 10px;border-left:3px solid #1f7ae0;background:#f4f9fe;
   color:#2a4550;font-size:12.5px;overflow-wrap:anywhere}}
 .litloc{{display:block;margin-top:3px;color:#9db3bf;font-size:11px}}
+.llm-mark{{margin-left:7px;font-size:9.5px;font-weight:700;color:#5b3fa8;background:#f1ecfc;
+  padding:2px 7px;border-radius:9px;text-transform:uppercase;letter-spacing:.04em;cursor:help}}
 .wpsrc{{font-size:11px;color:#9db3bf}} .wpsrc a{{color:#1f7ae0;text-decoration:none}}
 .dos{{font-size:12px;margin:10px 0}} .dos>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .dos code{{background:#eef4f7;padding:1px 4px;border-radius:3px}}

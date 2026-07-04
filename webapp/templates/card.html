@@ -75,7 +75,7 @@
 
 {% if h.literature %}
 <div class="block">
-  <h3>Использованная литература <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Дословные цитаты из загруженных материалов, подкрепляющие гипотезу. Ничего не додумано — только то, что есть в тексте.">?</a></h3>
+  <h3>Использованная литература <em class="llm-mark" title="выдержки нашла языковая модель при разборе загруженных материалов; дословность каждой цитаты проверена автоматически">LLM-разбор</em> <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Дословные цитаты из загруженных материалов, подкрепляющие гипотезу. Ничего не додумано — только то, что есть в тексте.">?</a></h3>
   <ul class="litlist">
     {% for lq in h.literature %}
     <li>

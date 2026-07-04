@@ -142,7 +142,8 @@
       {% if result.fabrics %}<a href="/runs/{{ run_id }}/export/summary" download>CSV эксперта (сводка)</a>
       <a href="/runs/{{ run_id }}/export/0/tasks" download>задачи Jira</a>{% endif %}
       <a href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener">глоссарий</a>
-      {% if result.get('literature_report') %}<a href="/runs/{{ run_id }}/report/{{ result.literature_report }}" target="_blank" rel="noopener">отчёт из литературы</a>{% endif %}
+      {% if result.get('literature_report') %}<a href="/runs/{{ run_id }}/report/{{ result.literature_report }}" target="_blank" rel="noopener"
+         title="гипотезы этого отчёта извлечены языковой моделью из загруженной литературы; каждая связь подтверждена дословной цитатой">отчёт из литературы <em class="llm-mark">LLM</em></a>{% endif %}
     </div>
     {% if result.get('metrics_total') and result.metrics_total.calls %}
     {% set mt = result.metrics_total %}
