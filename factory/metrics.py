@@ -8,7 +8,9 @@
                    проверяемость: чем чётче форма, тем однозначнее гипотеза);
   confidence     — полнота данных под гипотезой;
   feasibility    — реализуемость (нужно ли новое оборудование).
-Приоритет = impact · addressability · feasibility · confidence. Тоннаж — физический факт.
+Приоритет (НАША эвристическая свёртка, не факт — объяснена в глоссарии):
+  priority = impact · (0.5+0.5·addressability) · (0.7+0.3·clarity) · feasibility · confidence.
+Ведёт масштаб (impact — факт из данных), остальное модулирует. Тоннаж — физический факт.
 """
 from __future__ import annotations
 
@@ -75,8 +77,13 @@ class Scorer:
             feas = 1.0 if (diag and not diag.needs_equipment) else 0.6
             conf = self.confidence(cl, element)
             adr = min(addressability, 1.0)
-            # приоритет ВЕДЁТ масштаб (impact); излечимость модулирует ±, не доминирует
-            priority = impact * (0.5 + 0.5 * adr) * feas * conf
+            clr = self._clarity(cl, element)
+            # Приоритет ВЕДЁТ масштаб (impact — ФАКТ из данных: доля извлекаемых потерь).
+            # Остальное — модификаторы (наша эвристика, НЕ факт; формула объяснена в
+            # глоссарии): addressability и clarity — мягко (не переворачивают порядок),
+            # feasibility/confidence — множители. clarity включена, т.к. один чёткий
+            # механизм = понятнее и защитимее гипотеза (даёт «буст в понимании»).
+            priority = impact * (0.5 + 0.5 * adr) * (0.7 + 0.3 * clr) * feas * conf
             out[cl.size_class] = Metrics(
                 rec_tonnes=rec, impact=impact, addressability=adr,
                 clarity=self._clarity(cl, element), confidence=conf, feasibility=feas,

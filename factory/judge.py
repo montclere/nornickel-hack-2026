@@ -29,7 +29,7 @@ Excel гипотеза или из литературы. Ветка А отде�
 
 Запуск:
     uv run python -m factory.judge --kpi "снизить потери никеля"          # ветки А+Б
-    uv run python -m factory.judge --no-tailings --literature materials/reference/books
+    uv run python -m factory.judge --no-tailings --literature materials/knowledge/books
 """
 from __future__ import annotations
 
@@ -207,14 +207,14 @@ def _branch_b(cache_path, kpi, log):
     а не тихая переизвлечение с другими дефолтами (что и путало кэш раньше)."""
     from factory.discover import discover
     from factory.extract import load_cached_relations
-    from factory.kgraph import KnowledgeGraph
+    from factory.kgraph import RelationGraph
 
     rels = load_cached_relations(cache_path, log)
     if not rels:
         log(f"  → нет данных: сначала запустите "
             f"'python -m factory.flex <материалы> --kpi \"...\"'")
         return []
-    kg = KnowledgeGraph(rels)
+    kg = RelationGraph(rels)
     log(f"граф из кэша: {kg.stats()}")
     return discover(kg, kpi=kpi, limit=8)
 
@@ -280,7 +280,7 @@ def main():
     ap = argparse.ArgumentParser(
         description="LLM-as-judge: оценка ВСЕХ гипотез системы (хвосты + литература). "
                     "Ветку Б наполняет ТОЛЬКО flex.py — запустите его первым.")
-    ap.add_argument("--fabrics", default=os.path.join("materials", "fabrics"),
+    ap.add_argument("--fabrics", default=os.path.join("materials", "data", "fabrics"),
                     help="папка с фабриками (Хвосты*.xlsx) — ветка А")
     ap.add_argument("--cache", default=DEFAULT_CACHE,
                     help="кэш графа, наполненный 'python -m factory.flex ...' — ветка Б")

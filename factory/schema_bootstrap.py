@@ -71,6 +71,22 @@ def _scan_labels(path: str, anchor_col: int = 2, limit: int = 400) -> list:
     return labels
 
 
+def _infer_units(labels) -> tuple:
+    """Единица крупности и порог «тонкого класса» — ДЕТЕРМИНИРОВАННО по подписям.
+    Важно: class_upper_micron парсит ЧИСЛО из подписи как есть (без конвертации единиц),
+    поэтому порог «тонкого» задаём в той же числовой шкале, что и подписи (мкм → 20;
+    мм → 0.02 = те же 20 мкм). Иначе на отчёте в мм всё считалось бы тонким, а блоки
+    минералогии (фильтр по size_unit_marker) вообще не находились бы."""
+    joined = " ".join(labels).lower()
+    if "мкм" in joined or "µm" in joined or "мк" in joined:
+        return "мкм", 20.0
+    if "мм" in joined or (" mm" in joined) or joined.endswith("mm"):
+        return "мм", 0.02
+    if "mesh" in joined or "меш" in joined:
+        return "mesh", 200.0            # для mesh больше = мельче; порог условный, правит человек
+    return "мкм", 20.0                    # разумный дефолт домена обогащения
+
+
 def propose_schema(path: str, llm=None, name: str | None = None) -> ReportSchema:
     llm = llm or Yandex(temperature=0.0)
     if not llm.ready:
@@ -85,10 +101,12 @@ def propose_schema(path: str, llm=None, name: str | None = None) -> ReportSchema
     elements = [ElementSpec(label=e.get("label", ""), symbol=e.get("symbol", ""),
                             recoverable_forms=list(e.get("recoverable_forms", [])))
                for e in d.get("elements", []) if e.get("label") and e.get("symbol")]
+    unit_marker, fine_max = _infer_units(labels)
     return ReportSchema(
         name=name or f"bootstrapped_{os.path.splitext(os.path.basename(path))[0]}",
         size_table_anchor=d.get("size_table_anchor") or "Класс крупности",
         total_marker=d.get("total_marker") or "Итого",
+        size_unit_marker=unit_marker, fine_class_max_micron=fine_max,
         elements=elements,
         liberated_form=d.get("liberated_form"), locked_form=d.get("locked_form"))
 

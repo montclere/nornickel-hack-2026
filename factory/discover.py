@@ -51,7 +51,12 @@ class Discovery:
 
 
 def find_gaps(kg, thr=0.5):
-    """A→B, B→C есть, прямого A→C нет (нечёткий матч сущностей)."""
+    """A→B, B→C есть, прямого A→C нет (нечёткий матч сущностей).
+
+    Раньше здесь был вложенный `any(...)` по ВСЕМ рёбрам внутри двойного цикла — это
+    O(E³) и на большом корпусе взрывалось. Убрано: (a,c) не должно быть прямым ребром
+    (O(1) проверка), а близость к уже существующим связям теперь гасится метрикой
+    новизны при ранжировании (см. score) — там же, где ей и место."""
     edges = [(u, v, d) for u, v, d in kg.g.edges(data=True)]
     direct = {(u, v) for u, v, _ in edges}
     out, seen = [], set()
@@ -59,16 +64,33 @@ def find_gaps(kg, thr=0.5):
         for b2, c, d2 in edges:
             if _sim(b, b2) < thr or _sim(a, c) >= thr:
                 continue
-            if (a, c) in direct or any(_sim(a, u) >= thr and _sim(c, v) >= thr
-                                       for u, v, _ in edges):
+            if (a, c) in direct or (a, c) in seen:
                 continue
-            key = (a, c)
-            if key in seen:
-                continue
-            seen.add(key)
+            seen.add((a, c))
             sign = 1 if d1.get("sign", 0) * d2.get("sign", 0) >= 0 else -1
             out.append((a, b, c, sign, [d1, d2]))
     return out
+
+
+def _corpus_df(kg):
+    """Частота токенов по узлам графа (document frequency) — для оценки редкости."""
+    df = {}
+    for n in kg.g.nodes():
+        for t in _tokens(kg.label(n)):
+            df[t] = df.get(t, 0) + 1
+    return df, (kg.g.number_of_nodes() or 1)
+
+
+def _novelty(a_label, c_label, df, n_nodes):
+    """Новизна как РЕДКОСТЬ концептов связи в корпусе (idf-подобно): редкие сущности =
+    меньше представлены в имеющемся знании = новее. Это прокси к определению новизны из
+    QA («отличие от существующих составов в базе»): когда появится внешняя база готовых
+    решений, сюда подставляется непохожесть на неё; пока меряем редкость внутри корпуса,
+    что честнее прежней «разреженности графа по степеням вершин»."""
+    toks = _tokens(a_label) | _tokens(c_label)
+    if not toks:
+        return 0.0
+    return round(sum(1 - df.get(t, 0) / n_nodes for t in toks) / len(toks), 3)
 
 
 def find_direct(kg, kpi_tokens, thr=1):
@@ -97,17 +119,17 @@ def _all_as_direct(kg):
 # просто честно отодвигаем и иначе формулируем, см. ниже)
 _NON_ACTION_PENALTY = 0.6
 # факт про ЭТУ фабрику (role="state") — точнее общей теории, скромный бонус к рангу.
-# Сегодня почти все источники — "reference" (книги в materials/reference/), эффект
+# Сегодня почти все источники — "reference" (книги в materials/knowledge/), эффект
 # проявится, когда в materials появится проза про конкретную фабрику (см. ingest.py)
 _STATE_BONUS = 1.15
 
 
 def score(kg, cands, kpi_tokens=None, kind="gap"):
     kpi_tokens = kpi_tokens or set()
+    df, n_nodes = _corpus_df(kg)                 # один проход O(E) на корпус, дальше O(1)
     res = []
     for a, b, c, sign, chain in cands:
-        deg = kg.g.degree(a) + kg.g.degree(c)
-        novelty = round(1.0 / (1 + deg), 3)
+        novelty = _novelty(kg.label(a), kg.label(c), df, n_nodes)
         relevance = round(len(_tokens(c) & kpi_tokens) / (len(kpi_tokens) or 1), 3) \
             if kpi_tokens else 0.5
         # действие/роль рычага (A) — берём из ПЕРВОГО ребра цепочки, у него subject == A

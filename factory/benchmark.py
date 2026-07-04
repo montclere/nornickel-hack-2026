@@ -42,9 +42,17 @@ def eval_fabric(xlsx, docx):
     our -= {None}
     golden = golden_lines(docx)
     covered = [(g, family_of(g)) for g in golden]
+    golden_fams = {f for _, f in covered} - {None}
     hit = sum(1 for _, f in covered if f in our)
+    # RECALL — какую долю эталона покрыли; PRECISION — какая доля НАШИХ семейств
+    # действительно есть в эталоне (мера, что мы не «набросали всё подряд»);
+    # GROUNDING — доля гипотез с привязкой к конкретным ячейкам отчёта (не голословны).
+    precision_hits = sum(1 for f in our if f in golden_fams)
+    grounded = sum(1 for h in hyps if getattr(h, "evidence", None))
     return {"n_hyp": len(hyps), "our": our, "golden": covered,
-            "hit": hit, "total": len(golden)}
+            "hit": hit, "total": len(golden),
+            "precision_hit": precision_hits, "precision_den": len(our),
+            "grounded": grounded}
 
 
 def _run_judge(fabrics_root, cache_path, kpi, kpi_source):
@@ -73,7 +81,7 @@ def _run_judge(fabrics_root, cache_path, kpi, kpi_source):
 
 def main():
     ap = argparse.ArgumentParser(description="Сводный евал: ветка А (golden) + судья")
-    ap.add_argument("root", nargs="?", default="materials/fabrics", help="папка с фабриками")
+    ap.add_argument("root", nargs="?", default="materials/data/fabrics", help="папка с фабриками")
     ap.add_argument("--cache", default=DEFAULT_CACHE,
                     help="кэш графа, наполненный 'python -m factory.flex ...' — ветка Б")
     ap.add_argument("--kpi", default="", help="KPI для судьи; если не задан — берётся из "
@@ -106,8 +114,12 @@ def main():
         agg_hit += r["hit"]; agg_total += r["total"]
         rows.append((os.path.basename(d), r))
         cov = r["hit"] / r["total"] if r["total"] else 0
+        prec = r["precision_hit"] / r["precision_den"] if r["precision_den"] else 0
+        grnd = r["grounded"] / r["n_hyp"] if r["n_hyp"] else 0
         print(f"\n■ {os.path.basename(d):<10} гипотез: {r['n_hyp']} | "
-              f"покрытие эталона: {r['hit']}/{r['total']} = {cov:.0%}")
+              f"recall(покрытие эталона): {r['hit']}/{r['total']} = {cov:.0%} | "
+              f"precision(наши∈эталон): {r['precision_hit']}/{r['precision_den']} = {prec:.0%} | "
+              f"grounding(с ячейками): {grnd:.0%}")
         print(f"    наши семейства: {sorted(r['our'])}")
         for g, f in r["golden"]:
             mark = "✓" if f in r["our"] else "·"
@@ -116,7 +128,11 @@ def main():
     print("\n" + "-" * 78)
     total_cov = agg_hit / agg_total if agg_total else 0
     print(f"ВЕТКА А: {agg_hit}/{agg_total} эталонных гипотез = {total_cov:.0%} family-coverage "
-          "(из данных, не подсказано)")
+          "(recall из данных, не подсказано)")
+    print("⚠ Честная оговорка: официальный тест-эталон — ОДНА пара (QA), остальные "
+          "фабрики держим как разведочные (unlabeled). Family-coverage меряет пересечение "
+          "СЛОВАРЯ семейств и завышается, если каталог вмешательств широк; поэтому рядом "
+          "показаны precision (не набросали ли лишнего) и grounding (привязка к ячейкам).")
 
     judge_res = None
     if not args.no_judge:

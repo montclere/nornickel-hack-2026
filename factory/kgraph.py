@@ -16,7 +16,11 @@ def _norm_entity(s):
     return re.sub(r"\s+", " ", (s or "").strip().lower())
 
 
-class KnowledgeGraph:
+class RelationGraph:
+    """Граф связей ветки Б, извлечённых из ТЕКСТА (subject—тип→object) с провенансом.
+    Отдельная сущность от knowledge.ProfileGraph (граф профиля хвостов, ветка А) —
+    раньше оба назывались KnowledgeGraph."""
+
     def __init__(self, relations):
         self.g = nx.MultiDiGraph()
         for r in relations:

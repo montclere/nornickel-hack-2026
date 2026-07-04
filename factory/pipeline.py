@@ -11,8 +11,8 @@ import time
 from factory.analysis import analyze
 from factory.config import OUTPUTS_DIR
 from factory.generator import HypothesisGenerator
-from factory.intent import parse_intent
-from factory.knowledge import KnowledgeGraph
+from factory.intent import parse_intent, warn_intent
+from factory.knowledge import ProfileGraph
 from factory.reader import TailingsReader
 from factory.report import render
 from factory.schema import DEFAULT_SCHEMA, ReportSchema
@@ -34,7 +34,7 @@ class HypothesisFactory:
         t0 = time.perf_counter()
         intent = parse_intent(self.kpi)                     # KPI → целевой элемент + ограничения
         profile = TailingsReader(self.path, schema=self.schema).read()  # детерм. чтение по схеме
-        graph = KnowledgeGraph(profile)                     # граф знаний
+        graph = ProfileGraph(profile)                       # граф профиля потерь (ветка А)
         analysis = analyze(profile, element=intent.target_element)  # кривая раскрытия / формы
         hyps = HypothesisGenerator().generate(profile, kpi=self.kpi)  # диагноз + метрики (детерм.)
 
@@ -84,10 +84,7 @@ def main():
     print(f"детерминированно за {tech['seconds']} c · граф {tech['nodes']} узлов / "
           f"{tech['edges']} рёбер · LLM: {tech['llm']}")
     print("=" * 74)
-    if not res["intent"].element_detected:
-        print(f"⚠ элемент не распознан в KPI «{args.kpi}» — использован дефолт "
-              f"({res['intent'].target_element}). Если нужен другой элемент, "
-              f"упомяните его явно в KPI (напр. «медь»/«Cu»).")
+    warn_intent(res["intent"], args.kpi)
     if p.warnings:
         print("⚠ ВАЛИДАЦИЯ (парс мог сбиться):")
         for w in p.warnings:

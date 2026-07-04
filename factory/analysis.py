@@ -10,8 +10,9 @@
 """
 from __future__ import annotations
 
-from factory.reader import LIBERATED, LOCKED, PRIMARY_ELEMENT, class_sort_key
-from factory.rules import FORM_NOTES
+from factory.reader import (LIBERATED, LOCKED, PRIMARY_ELEMENT, class_sort_key,
+                            class_upper_micron)
+from factory.rules import FORM_NOTES, _is_fine
 
 
 def _target_forms(cl, element):
@@ -52,18 +53,21 @@ def optimal_grind(lib_rows):
 
 
 def tradeoffs(profile, lib_rows, element):
-    """Противоречия между вмешательствами (данные это подтверждают)."""
+    """Противоречия между вмешательствами (данные это подтверждают).
+
+    «Тонкий класс» определяется ПОРОГОМ из схемы (_is_fine), а не белым списком имён
+    «-10»/«-20+10» — иначе на фабрике с другой разбивкой/единицами функция молча
+    ничего не находила. Берём самый тонкий класс (минимальная верхняя граница)."""
     out = []
-    by = {r["class"]: r for r in lib_rows}
-    coarse_locked = [r for r in lib_rows
-                     if r["class"] not in ("-10", "-20+10") and r["locked_pct"] > 40]
-    fines = by.get("-10")
+    coarse_locked = [r for r in lib_rows if not _is_fine(r["class"]) and r["locked_pct"] > 40]
+    fine_rows = [r for r in lib_rows if _is_fine(r["class"])]
+    fines = min(fine_rows, key=lambda r: class_upper_micron(r["class"]) or 0, default=None)
     if coarse_locked and fines and fines["liberated_pct"] > 25:
         out.append(
             f"Измельчение крупных классов раскроет закрытый {element}-содержащий минерал, "
-            f"НО увеличит долю -10 мкм, где уже {fines['liberated_pct']}% раскрытого "
-            f"{element} теряется со шламами. Нужен баланс: доизмельчение крупного + "
-            f"отдельная схема улавливания -10.")
+            f"НО увеличит долю тонкого класса {fines['class']}, где уже "
+            f"{fines['liberated_pct']}% раскрытого {element} теряется со шламами. Нужен "
+            f"баланс: доизмельчение крупного + отдельная схема улавливания {fines['class']}.")
     return out
 
 

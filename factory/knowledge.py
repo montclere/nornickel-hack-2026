@@ -12,7 +12,11 @@ import networkx as nx
 from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT, class_sort_key
 
 
-class KnowledgeGraph:
+class ProfileGraph:
+    """Граф профиля потерь ветки А (Элемент→Класс→Форма). Отдельная сущность от
+    kgraph.RelationGraph (граф связей из ТЕКСТА, ветка Б) — раньше оба назывались
+    KnowledgeGraph, что путало импорт."""
+
     def __init__(self, profile):
         self.profile = profile
         self.g = nx.MultiDiGraph()

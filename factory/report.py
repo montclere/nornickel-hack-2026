@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import html
 
+from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT
+
 
 def _esc(x):
     return html.escape(str(x if x is not None else ""))
@@ -91,6 +93,9 @@ def _card(h):
         warn = (f'<div class="warn">⚠ нарушает ограничение из запроса: '
                f'{_esc(", ".join(h.violates_constraints))} — приоритет намеренно занижен, '
                f'но гипотеза не скрыта</div>')
+    # плитки металла — по КЛЮЧАМ rec_tonnes (из схемы), а не по зашитым Ni/Cu
+    metal_pills = "".join(f'<div class="pill"><b>{v}</b><span>т {_esc(sym)} извлек.</span></div>'
+                          for sym, v in (h.metrics.get("rec_tonnes") or {}).items())
     wp = _world_practice_html(h.world_practice)
     return f"""
     <article class="card">
@@ -112,8 +117,7 @@ def _card(h):
         <div class="bar-row"><div class="bar-head"><span>addressability — «излечимость»</span><b>{m['addressability']}</b></div>
           <div class="bar"><i style="width:{m['addressability']*100:.0f}%"></i></div></div>
         <div class="pills">
-          <div class="pill"><b>{m['rec_tonnes'].get('Ni',0)}</b><span>т Ni извлек.</span></div>
-          <div class="pill"><b>{m['rec_tonnes'].get('Cu',0)}</b><span>т Cu извлек.</span></div>
+          {metal_pills}
           <div class="pill"><b>{m['clarity']}</b><span>ясность механизма</span></div>
           <div class="pill"><b>{m['feasibility']}</b><span>реализуемость</span></div>
         </div>
@@ -176,7 +180,7 @@ def _analysis_html(a):
         f'<td>{_esc(r["form"])}</td><td>{r["tonnes"]} т</td><td>{r["share_pct"]}%</td>'
         f'<td>{_esc(r["status"])}</td><td class="why">{_esc(r["why"])}</td></tr>'
         for r in a.get("forms", []))
-    el = a.get("element", "Ni")
+    el = a.get("element") or PRIMARY_ELEMENT
     return f"""
   <div class="panel">
     <h2>Кривая раскрытия по крупности ({_esc(el)})</h2>
@@ -197,8 +201,17 @@ def _analysis_html(a):
 
 
 def render(profile, layered, hyps, kpi="", tech=None, analysis=None):
-    total_ni = round(sum(h.metrics["rec_tonnes"].get("Ni", 0) for h in hyps), 1)
-    total_cu = round(sum(h.metrics["rec_tonnes"].get("Cu", 0) for h in hyps), 1)
+    # итоги по металлам — по всем символам схемы, а не по зашитым Ni/Cu
+    symbols = list(ELEMENT_SYMBOLS)
+    for h in hyps:                                   # добираем символы, если схема шире
+        for sym in (h.metrics.get("rec_tonnes") or {}):
+            if sym not in symbols:
+                symbols.append(sym)
+    totals = {sym: round(sum(h.metrics["rec_tonnes"].get(sym, 0) for h in hyps), 1)
+              for sym in symbols}
+    metal_summary = "".join(
+        f'<span><b>{v} т</b><br>извлекаемого {_esc(sym)} в хвостах (факт)</span>'
+        for sym, v in totals.items())
     cards = "\n".join(_card(h) for h in hyps)
     graph = _graph_svg(layered)
     techln = ""
@@ -281,8 +294,7 @@ footer a{{color:var(--blue);text-decoration:none}}
   {"".join(f'<div class="warn">⚠ {_esc(w)}</div>' for w in getattr(profile, "warnings", []))}
   <div class="kpi"><b>KPI</b> &nbsp;{_esc(kpi)}</div>
   <div class="summary">
-    <span><b>{total_ni} т</b><br>извлекаемого Ni в хвостах (факт)</span>
-    <span><b>{total_cu} т</b><br>извлекаемого Cu в хвостах (факт)</span>
+    {metal_summary}
     <span><b>{len(hyps)}</b><br>гипотез по классам крупности</span>
   </div>
   <div class="tech">оценка безразмерна (без цен): impact — масштаб потери, addressability — излечимость, clarity — ясность механизма · источник: {_esc(profile.source)}</div>

@@ -35,8 +35,11 @@ IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
               ".webp": "image/webp"}
 IMAGE_EXTS = set(IMAGE_MIME)
 
-_STATE_DIR_HINTS = {"state", "fabrics", "фабрики", "состояние", "объект", "объекты"}
-_REFERENCE_DIR_HINTS = {"reference", "справочники", "методички", "литература", "reference_materials"}
+# «данные» (state) — факты о КОНКРЕТНОЙ фабрике; «знания» (reference) — общее знание домена.
+# Различаем по имени папки в пути. Держим и старые имена (fabrics/reference) для совместимости.
+_STATE_DIR_HINTS = {"data", "данные", "state", "fabrics", "фабрики", "состояние", "объект", "объекты"}
+_REFERENCE_DIR_HINTS = {"knowledge", "знания", "reference", "справочники", "методички",
+                        "литература", "reference_materials"}
 
 
 def _infer_role(path: str) -> str:

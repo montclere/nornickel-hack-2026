@@ -45,7 +45,7 @@ class HypothesisGenerator:
     def __init__(self, scorer: Scorer | None = None):
         self.scorer = scorer or Scorer()
 
-    def generate(self, profile, kpi: str = "") -> list:
+    def generate(self, profile, kpi: str = "", log=lambda *a: None) -> list:
         intent = parse_intent(kpi)
         element = intent.target_element
         diagnoses = {cl.size_class: diagnose(cl.dominant_recoverable_form(element),
@@ -56,7 +56,14 @@ class HypothesisGenerator:
         hyps = []
         for cl in profile.classes:
             diag = diagnoses.get(cl.size_class)
-            if diag is None or sum(metrics[cl.size_class].rec_tonnes.values()) <= 0:
+            # НЕ молчим: если класс не даёт гипотезы — честно говорим почему (нет
+            # извлекаемой формы вовсе / нулевой извлекаемый тоннаж по целевому элементу)
+            if diag is None:
+                log(f"класс {cl.size_class}: пропущен — нет извлекаемой формы {element} "
+                    f"(дом. форма отсутствует/неизвлекаема)")
+                continue
+            if sum(metrics[cl.size_class].rec_tonnes.values()) <= 0:
+                log(f"класс {cl.size_class}: пропущен — нулевой извлекаемый тоннаж {element}")
                 continue
             hyps.append(self._build(cl, diag, metrics[cl.size_class], element, intent))
 

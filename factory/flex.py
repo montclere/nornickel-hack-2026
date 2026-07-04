@@ -23,7 +23,7 @@ fallback.
 
 Запуск:
     uv run python -m factory.flex materials --kpi "снизить потери никеля с хвостами"
-    uv run python -m factory.flex materials/reference/books --kpi "повысить извлечение Ni"
+    uv run python -m factory.flex materials/knowledge/books --kpi "повысить извлечение Ni"
 """
 from __future__ import annotations
 
@@ -78,9 +78,16 @@ def main():
                               timestamp=time.strftime("%Y-%m-%d %H:%M:%S")),
                     args.run_config)
 
+    # разбираем KPI сразу — чтобы честно предупредить, если целевой элемент не распознан
+    # или его нет в схеме отчёта (иначе ветка А молча выдаст никель под видом ответа)
+    from factory.intent import parse_intent, warn_intent
+    intent = parse_intent(args.kpi)
+    skip_branch_a = warn_intent(intent, args.kpi, emit=lambda m: print("\n" + m))
+
     print("=" * 74)
     print("ГИБКИЙ ПРИЁМ МАТЕРИАЛОВ")
-    print(f"KPI: {args.kpi}")
+    print(f"KPI: {args.kpi}  (целевой элемент: {intent.target_element}"
+          f"{'' if intent.element_in_schema else ' — ВНЕ схемы хвостов'})")
     print(f"конфиг запуска сохранён: {args.run_config} "
           f"(его переиспользуют benchmark/judge без --kpi)")
     print("=" * 74)
@@ -123,7 +130,13 @@ def main():
 
     # --- ветка 1: детерминированная диагностика хвостов ---
     all_hyps = []
-    if tailings:
+    if tailings and skip_branch_a:
+        print("\n" + "─" * 74)
+        print(f"ДИАГНОСТИКА ХВОСТОВ ПРОПУЩЕНА: целевого элемента "
+              f"«{intent.requested_element}» нет в отчётах (см. предупреждение выше). "
+              f"Работает только ветка Б (литература).")
+        print("─" * 74)
+    if tailings and not skip_branch_a:
         from factory.pipeline import HypothesisFactory
         print("\n" + "─" * 74)
         print("ДЕТЕРМИНИРОВАННАЯ ДИАГНОСТИКА ХВОСТОВ (без LLM)")
@@ -152,7 +165,7 @@ def main():
     if others:
         from factory.discover import discover
         from factory.extract import extract_relations
-        from factory.kgraph import KnowledgeGraph
+        from factory.kgraph import RelationGraph
         from factory.llm import Yandex
         print("\n" + "─" * 74)
         print("ИЗВЛЕЧЕНИЕ ИЗ ТЕКСТА → ГРАФ → РАЗРЫВЫ СВОНСОНА")
@@ -188,7 +201,7 @@ def main():
         os.makedirs(OUTPUTS_DIR, exist_ok=True)
         rels = extract_relations(chunks, llm=llm, max_chunks=args.max_chunks,
                                  query=query, cache_path=cache, log=lambda m: print("  " + m))
-        kg = KnowledgeGraph(rels)
+        kg = RelationGraph(rels)
         print(f"канонический граф: {kg.stats()}")
         found = discover(kg, kpi=query, limit=8)
         print(f"\nнайдено гипотез-разрывов: {len(found)}")

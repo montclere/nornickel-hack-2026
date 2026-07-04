@@ -166,6 +166,8 @@ def _process_triples(c, triples):
         subj, obj = t.get("subject", ""), t.get("object", "")
         if not (subj and obj) or rel is None or len(q) < 8 or not _quote_ok(q, nt, ocr):
             continue
+        if _norm(subj) == _norm(obj):            # петля «X → X» — не связь, а шум LLM
+            continue
         out.append({"subject": subj.strip(), "relation": rel, "sign": RELATION_VOCAB[rel],
                     "object": obj.strip(), "quote": t.get("quote", "").strip(),
                     "is_action": bool(t.get("is_action", False)),  # промышленное действие?

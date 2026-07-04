@@ -133,8 +133,11 @@ class TailingsReader:
             if el and el not in found:
                 found[el] = (c, c + 1)
         if set(found) == set(default_cols) and len({c for c, _ in found.values()}) == len(found):
-            return found
-        return default_cols
+            return found, True
+        # НЕ нашли якоря всех элементов → возвращаем документированную раскладку по
+        # умолчанию, но вторым значением сигналим «это ДОГАДКА» — read() выдаст жёсткий
+        # warning, чтобы не смапить не те колонки молча (см. M2 в аудите)
+        return default_cols, False
 
     def read(self) -> TailingsProfile:
         sc = self.schema
@@ -155,15 +158,27 @@ class TailingsReader:
             return prof
         start = hdr_rows[-1]
 
-        ecol = self._element_columns(grid, start)  # {элемент: (pct_col, tonnes_col)}
+        ecol, matched = self._element_columns(grid, start)  # {элемент: (pct_col, tonnes_col)}
+        if not matched:
+            prof.warnings.append(
+                "не удалось найти подписи-якоря ВСЕХ элементов схемы у шапки таблицы — "
+                "колонки (%, т) взяты по РАСКЛАДКЕ ПО УМОЛЧАНИЮ (доля, затем пары по "
+                "порядку элементов). Если числа не сходятся — проверьте схему/формат: "
+                "маппинг колонок здесь — догадка, а не распознавание.")
 
-        # --- таблица классов крупности ---
+        # --- таблица классов крупности: сканируем до маркера «Итого», без магической
+        # границы в N строк (раньше было +12 — обрезало бы фабрику с >11 классами) ---
         r = start + 1
         classes: dict[str, ClassLoss] = {}
-        while r < start + 12:
+        blanks = 0
+        while r < start + 60:
             b = grid.get((r, sc.anchor_col))
             if b is None:
+                blanks += 1
+                if blanks >= 8:                # длинный разрыв — таблица кончилась
+                    break
                 r += 1; continue
+            blanks = 0
             if str(b).startswith(sc.total_marker):
                 break
             cls = _norm_class(b)
@@ -216,13 +231,24 @@ class TailingsReader:
         """Прочитать формы блока: строки от header+1 до маркера конца (схема)."""
         sc = self.schema
         forms_seen = {f.form + f.element for f in cl.forms}  # анти-дубли между секциями
+        # сканируем до стоп-маркера/длинного разрыва, а не до жёсткого +12 (иначе блок
+        # минералогии с >11 формами молча обрезался бы)
         r = header_row + 1
-        while r < header_row + 12:
+        blanks = 0
+        while r < header_row + 40:
             b = grid.get((r, sc.anchor_col))
             if b is None:
+                blanks += 1
+                if blanks >= 6:
+                    break
                 r += 1; continue
+            blanks = 0
             name = str(b).strip()
             if any(name.startswith(m) or m in name for m in sc.mineralogy_stop_markers):
+                break
+            # начался СЛЕДУЮЩИЙ блок минералогии (строка-заголовок класса с единицей
+            # крупности) — не залезаем в него, иначе метки классов прочтутся как «формы»
+            if sc.size_unit_marker in name:
                 break
             for el, (pcol, tcol) in ecol.items():
                 t = _num(grid.get((r, tcol)))
