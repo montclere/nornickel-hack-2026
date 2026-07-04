@@ -93,6 +93,9 @@ rules.py     (доминирующая форма + крупность) → се
 metrics.py   impact (доля потерь) · addressability (излечимость) · clarity (ясность механизма) ·
              feasibility · confidence → priority. Всё безразмерно, из данных, без цен.
 generator.py карточка ЕСЛИ/ТО/ПОТОМУ ЧТО/ЭКСПЕРИМЕНТ + заземление до ячейки + источники
+roadmap.py   дорожная карта эксперимента: лаборатория → пилот (одна секция) → внедрение,
+             у каждого этапа критерий перехода го/стоп; методика этапов зависит от
+             семейства вмешательства (читаемая таблица, как rules.py)
              метода; помечает нарушенные ограничения промпта, не скрывая гипотезу
 ```
 Без LLM, ~0.03 c, тот же файл + та же схема → тот же результат.
@@ -338,7 +341,7 @@ KPI НЕ настраивается через env/дефолт — только
 | Безопасность (локально) | ⚠️ | ядро локально без ключа; LLM-ветка — облако Yandex |
 | Экспертная настройка весов | ⚠️/✅ | веса правил — в коде; вердикты по гипотезам эксперт правит в Excel/feedback.json без кода (feedback.py) |
 | Мировая практика / подтверждено внедрением | ⚠️ | явный `world_practice` placeholder в карточке — ждёт модуль веб-поиска |
-| Дорожная карта эксперимента | ❌ | не реализовано (есть только протокол одного эксперимента) |
+| Дорожная карта эксперимента | ✅ | roadmap.py: лаборатория → пилот на одной секции → внедрение, с критериями го/стоп; в HTML-карточке, PDF/DOCX, JSON и задачах |
 | Обучение на фидбэке | ✅ | feedback.py: вердикты эксперта (CSV→feedback.json) → детерминированный ре-ранк; «уже пробовали» = не ново (новизна от базы направлений) |
 
 ## Структура
@@ -346,7 +349,7 @@ KPI НЕ настраивается через env/дефолт — только
 factory/
   schema.py schema_bootstrap.py intent.py               ← конфиг формата + разбор KPI (без LLM в ядре)
   ingest.py extract.py kgraph.py discover.py flex.py report_kb.py  ← гибкая ветка (текст → граф → открытие → HTML)
-  reader.py analysis.py rules.py metrics.py generator.py pipeline.py  ← детерминированная ветка (хвосты)
+  reader.py analysis.py rules.py metrics.py generator.py roadmap.py pipeline.py  ← детерминированная ветка (хвосты)
   export.py feedback.py batch.py                         ← экспорт (PDF/DOCX/CSV/JSON/Jira) + фидбэк-цикл + батч по набору KPI
   config.py llm.py report.py glossary.py evaluate.py benchmark.py judge.py docs/build_guide.py
 materials/   fabrics/<Ф>/ (Хвосты+Гипотезы) · reference/ (books/schemes/regulations)   [вне git]

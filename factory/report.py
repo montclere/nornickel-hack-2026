@@ -134,10 +134,24 @@ def _card(h):
       </div>
       <div class="alts"><b>Альтернативы:</b><ul>{alts}</ul></div>
       <div class="exp"><b>Эксперимент:</b><p>{_esc(h.experiment)}</p></div>
+      {_roadmap_html(getattr(h, "roadmap", None))}
       <div class="evidence"><b>Заземление (ячейки отчёта):</b>{ev}</div>
       <div class="src"><b>Источники метода:</b><ul>{src}</ul></div>
       <div class="wp"><b>Мировая практика:</b>{wp}</div>
     </article>"""
+
+
+def _roadmap_html(rm):
+    """Дорожная карта эксперимента: этапы лаборатория→пилот→внедрение с критериями
+    перехода (го/стоп). Строится детерминированным шаблоном в roadmap.py."""
+    if not rm:
+        return ""
+    steps = "".join(
+        f'<li><b>{_esc(s["name"])}.</b> {_esc(s["actions"])}'
+        f'<span class="crit">критерий перехода: {_esc(s["success"])}</span></li>'
+        for s in rm)
+    return (f'<div class="rm"><b>Дорожная карта эксперимента:</b>'
+            f'<ol>{steps}</ol></div>')
 
 
 def _world_practice_html(wp):
@@ -275,6 +289,11 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .exp{{font-size:13px;margin:10px 0;background:#f6fbfd;border:1px solid var(--line);
   border-radius:10px;padding:10px 12px}}
 .exp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}} .exp p{{margin:4px 0 0}}
+.rm{{font-size:13px;margin:10px 0;background:#f6fbfd;border:1px solid var(--line);
+  border-radius:10px;padding:10px 14px}}
+.rm>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.rm ol{{margin:6px 0 0;padding-left:20px}} .rm li{{margin:0 0 8px}}
+.rm .crit{{display:block;margin-top:2px;font-size:12px;color:#0a7f79}}
 .src{{font-size:12px;margin:10px 0}} .src b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .src ul{{margin:5px 0 0;padding-left:18px;color:#37505c}} .src li{{margin:2px 0}}
 .wp{{font-size:12px;margin:10px 0}} .wp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}

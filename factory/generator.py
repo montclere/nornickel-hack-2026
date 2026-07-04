@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from factory.intent import Intent, parse_intent
 from factory.metrics import Scorer
 from factory.reader import ELEMENT_SYMBOLS
+from factory.roadmap import build_roadmap
 from factory.rules import diagnose
 
 
@@ -36,6 +37,7 @@ class Hypothesis:
     evidence: list                # [{"label","cell","source"}] — заземление до ячейки
     sources: list
     violates_constraints: list = field(default_factory=list)  # ограничения из промпта, которые нарушены
+    roadmap: list = field(default_factory=list)  # лаборатория→пилот→внедрение с критериями (roadmap.py)
     world_practice: str | None = None   # TODO(веб-поиск): подтверждение внедрения в мировой практике
     expert_feedback: dict | None = None  # вердикт эксперта из feedback.json (см. feedback.py)
     metrics: dict = field(default_factory=dict)
@@ -123,4 +125,6 @@ class HypothesisGenerator:
                                f"извлекаемого {element} сидит преимущественно в форме "
                                f"«{dom}»; {diag.mechanism}"),
             experiment=experiment, evidence=evidence, sources=diag.sources,
-            violates_constraints=violates, metrics=m_dict)
+            violates_constraints=violates, metrics=m_dict,
+            # дорожная карта: лаборатория → пилот → внедрение, с критериями перехода
+            roadmap=build_roadmap(diag.family, primary, cl.size_class, element))
