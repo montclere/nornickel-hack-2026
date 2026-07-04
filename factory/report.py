@@ -144,9 +144,9 @@ def _card(h, runinfo=None):
       </div>
       {warn}
       <div class="bars">
-        <div class="bar-row"><div class="bar-head"><span>impact — масштаб потери</span><b>{impact_pct}%</b></div>
+        <div class="bar-row"><div class="bar-head"><span>масштаб потери</span><b>{impact_pct}%</b></div>
           <div class="bar"><i style="width:{min(m['impact']*100,100):.0f}%"></i></div></div>
-        <div class="bar-row"><div class="bar-head"><span>addressability — «излечимость»</span><b>{m['addressability']}</b></div>
+        <div class="bar-row"><div class="bar-head"><span>излечимость</span><b>{m['addressability']}</b></div>
           <div class="bar"><i style="width:{m['addressability']*100:.0f}%"></i></div></div>
         <div class="pills">
           {metal_pills}
@@ -161,8 +161,8 @@ def _card(h, runinfo=None):
         <div class="exprow"><span>критерий</span><p>{_esc(h.exp_criterion)}</p></div>
       </div>
       {_roadmap_html(getattr(h, "roadmap", None))}
-      <div class="evidence"><b>Заземление — ячейки отчёта (клик открывает файл):</b>{ev}</div>
-      <div class="src"><b>Основание метода (правило диагностики):</b><ul>{src}</ul></div>
+      <div class="evidence"><b>Заземление (ячейки отчёта)</b>{ev}</div>
+      <div class="src"><b>Основание метода</b><ul>{src}</ul></div>
       {_literature_html(getattr(h, "literature", None))}
       <div class="wp"><b>Мировая практика:</b>{wp}</div>
       {_dossier_html(getattr(h, "dossier", None), runinfo.get("dossier"))}
@@ -173,11 +173,10 @@ def _dossier_html(dossier, searched=None):
     """Досье OpenAlex: реальные источники с цитируемостью («важность») + фраза из
     abstract («причина») + ссылка. Детерминированно, без LLM."""
     if not dossier:
-        msg = ('по этой гипотезе релевантных научных работ не найдено'
+        msg = ('работ не найдено'
                if searched else
-               'не искалась — запустите с <code>--dossier</code> '
-               '(научные источники OpenAlex: причины + важность по цитируемости)')
-        return f'<div class="dos"><b>Доказательная база:</b><p class="muted">{msg}</p></div>'
+               'поиск не запускался (<code>--dossier</code>)')
+        return f'<div class="dos"><b>Научные источники:</b><p class="muted">{msg}</p></div>'
     items = "".join(
         f'<div class="dosrc"><div class="doshead">'
         f'<span class="cit">{e.get("cited_by", 0)} цит.</span>'
@@ -186,7 +185,7 @@ def _dossier_html(dossier, searched=None):
         f'<span class="yr">{e.get("year") or ""}</span></div>'
         f'<div class="dosq">«{_esc(e.get("quote",""))}»</div></div>'
         for e in dossier)
-    return (f'<div class="dos"><b>Доказательная база ({len(dossier)} источн., OpenAlex):</b>'
+    return (f'<div class="dos"><b>Научные источники ({len(dossier)})</b>'
             f'{items}</div>')
 
 
@@ -199,7 +198,7 @@ def _literature_html(lit):
         f'<blockquote class="litq">«{_esc(e["quote"])}»'
         f'<span class="litloc">{_esc(e.get("locator") or e.get("source") or "")}</span>'
         f'</blockquote>' for e in lit)
-    return f'<div class="lit"><b>Подтверждение из базы знаний (выданный корпус):</b>{qs}</div>'
+    return f'<div class="lit"><b>Из базы знаний</b>{qs}</div>'
 
 
 def _roadmap_html(rm):
@@ -219,10 +218,9 @@ def _world_practice_html(wp, searched=None):
     """world_practice: dict {practice,quote,url,site} от веб-поиска, либо None.
     Показываем резюме + ДОСЛОВНУЮ цитату + кликабельный источник (заземление)."""
     if not wp:
-        msg = ('по этому вмешательству подтверждающего источника в вебе не найдено'
+        msg = ('подтверждение в вебе не найдено'
                if searched else
-               'не искалась — запустите с <code>--web</code> (подтверждение в мировой '
-               'практике с цитатой и ссылкой)')
+               'поиск не запускался (<code>--web</code>)')
         return f'<p class="muted">{msg}</p>'
     if isinstance(wp, str):        # обратная совместимость
         return f'<p class="muted">{_esc(wp)}</p>'
@@ -324,7 +322,7 @@ def render_literature(discoveries, kpi=""):
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гипотезы из литературы</title>
 <style>
-body{{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#12303f;
+body{{margin:0;font-family:'Ubuntu',-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#12303f;
   background:linear-gradient(180deg,#e7f3fa,#eef6fb);line-height:1.5}}
 .wrap{{max-width:860px;margin:0 auto;padding:34px 20px 60px}}
 h1{{font-size:24px;font-weight:800;margin:0 0 4px}} h1 span{{color:#12b3ab}}
@@ -413,7 +411,7 @@ def render(profile, layered, hyps, kpi="", tech=None, analysis=None, runinfo=Non
 <title>Фабрика гипотез · {_esc(profile.fabric)}</title>
 <style>
 :root{{--ink:#12303f;--muted:#5f7d8c;--blue:#1f7ae0;--teal:#12b3ab;--teal-soft:#e6f7f5;--line:#e6eef3}}
-*{{box-sizing:border-box}} body{{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+*{{box-sizing:border-box}} body{{margin:0;font-family:'Ubuntu',-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   background:linear-gradient(180deg,#e7f3fa,#eef6fb);color:var(--ink);line-height:1.55}}
 .wrap{{max-width:940px;margin:0 auto;padding:38px 22px 70px}}
 h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{color:var(--teal)}}
@@ -428,7 +426,7 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .panel h2{{margin:0 0 4px;font-size:15px}} .panel .h-sub{{color:var(--muted);font-size:12px;margin-bottom:8px}}
 .legend{{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-top:6px;flex-wrap:wrap}}
 .legend i{{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}}
-.card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin:0 0 16px;
+.card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin:0 0 18px;
   box-shadow:0 2px 12px rgba(31,122,224,.06);transition:box-shadow .18s ease,transform .18s ease,border-color .18s}}
 .card:hover{{box-shadow:0 8px 26px rgba(31,122,224,.13);transform:translateY(-2px);border-color:#cfe0ea}}
 /* строка источника + бейджи прогона (что применялось) */
@@ -527,7 +525,7 @@ footer a{{color:var(--blue);text-decoration:none}}
   <div class="kpi"><b>KPI</b> &nbsp;{_esc(kpi)}</div>
   <div class="summary">
     {metal_summary}
-    <span><b>{len(hyps)}</b><br>гипотез по классам крупности</span>
+    <span><b>{len(hyps)}</b><br>гипотез</span>
   </div>
   <div class="panel">
     <h2>Граф знаний</h2>
@@ -539,7 +537,7 @@ footer a{{color:var(--blue);text-decoration:none}}
     </div>
   </div>
   {_analysis_html(analysis)}
-  <h2 style="margin:0 0 10px;font-size:16px">Ранжированные гипотезы (по приоритету: масштаб × излечимость × реализуемость)</h2>
+  <h2 style="margin:0 0 10px;font-size:16px">Гипотезы</h2>
   {cards}
   {_metrics_footer()}
   <footer><a href="glossary.html">как читать граф, кривые и метрики →</a></footer>

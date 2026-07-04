@@ -149,7 +149,7 @@ def render_kb(layered, discoveries, kpi="", tech=None):
 <title>Фабрика гипотез · литература</title>
 <style>
 :root{{--ink:#12303f;--muted:#5f7d8c;--blue:#1f7ae0;--teal:#12b3ab;--teal-soft:#e6f7f5;--line:#e6eef3}}
-*{{box-sizing:border-box}} body{{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+*{{box-sizing:border-box}} body{{margin:0;font-family:'Ubuntu',-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   background:linear-gradient(180deg,#e7f3fa,#eef6fb);color:var(--ink);line-height:1.55}}
 .wrap{{max-width:940px;margin:0 auto;padding:38px 22px 70px}}
 h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{color:var(--teal)}}

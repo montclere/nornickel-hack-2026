@@ -4,18 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block title %}Фабрика гипотез{% endblock %}</title>
+  <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
   <header class="top">
     <a class="brand" href="/">Фабрика <span>гипотез</span></a>
-    <span class="pill-local">локальный инстанс · данные наружу не уходят</span>
     <span id="health" class="health" title="доступность сервисов">проверка сервисов…</span>
   </header>
   <main class="wrap">
     {% block content %}{% endblock %}
   </main>
-  <footer class="foot">детерминированное ядро · LLM только для понимания текста (с цитатным гейтом)</footer>
   <script src="/static/app.js"></script>
 </body>
 </html>

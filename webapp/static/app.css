@@ -1,19 +1,21 @@
-/* Фабрика гипотез — минималистичная дизайн-система. Светлая, спокойная, один акцент. */
+/* Фабрика гипотез — единая гамма с HTML-отчётом ядра (report.py):
+   бирюза #12b3ab / синий #1f7ae0 на светлом градиенте, шрифт Ubuntu (вшит локально). */
 :root{
-  --bg:#f5f8fb; --surface:#fff; --surface-2:#fafcfe;
-  --ink:#182a36; --muted:#647889; --faint:#93a6b4;
-  --line:#e6edf3; --line-2:#eef3f8;
-  --accent:#0ea3a0; --accent-2:#2670e6; --accent-soft:#e6f6f5; --accent-ink:#0a7f7b;
-  --warn-bg:#fff7ec; --warn-line:#f6dcb0; --warn-ink:#8a5a12;
-  --violet-bg:#f2edfc; --violet-line:#ddd0f5; --violet-ink:#5b3fa8;
+  --bg-grad:linear-gradient(180deg,#e7f3fa,#eef6fb); --surface:#fff; --surface-2:#f6fbfd;
+  --ink:#12303f; --muted:#5f7d8c; --faint:#9db3bf;
+  --line:#e6eef3; --line-2:#eef3f8;
+  --accent:#12b3ab; --accent-2:#1f7ae0; --accent-soft:#e6f7f5; --accent-ink:#0a7f79;
+  --warn-bg:#fff6e9; --warn-line:#f4dcae; --warn-ink:#8a5a12;
+  --violet-bg:#f1ecfc; --violet-line:#d9ccf5; --violet-ink:#5b3fa8;
   --r-sm:9px; --r:13px; --r-lg:18px;
-  --sh-sm:0 1px 2px rgba(20,40,55,.05), 0 1px 3px rgba(20,40,55,.05);
-  --sh-md:0 6px 22px rgba(31,90,150,.10);
+  --sh-sm:0 2px 12px rgba(31,122,224,.06);
+  --sh-md:0 8px 26px rgba(31,122,224,.13);
   --grad:linear-gradient(135deg,var(--accent-2),var(--accent));
   --fs:15px;
 }
 @media (prefers-color-scheme:dark){
-  :root{--bg:#0e161d;--surface:#141f28;--surface-2:#18242e;--ink:#e6eef4;--muted:#93a7b5;
+  :root{--bg-grad:linear-gradient(180deg,#0e161d,#101b24);--surface:#141f28;--surface-2:#18242e;
+    --ink:#e6eef4;--muted:#93a7b5;
     --faint:#6f8391;--line:#243441;--line-2:#1e2c37;--accent-soft:#0f2b2c;--accent-ink:#3fd8d2;
     --warn-bg:#2a2113;--warn-line:#4a3a1c;--warn-ink:#e5b877;
     --violet-bg:#20193a;--violet-line:#372a5e;--violet-ink:#c3b1f0;
@@ -21,8 +23,8 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
-  font-size:var(--fs);line-height:1.55;color:var(--ink);background:var(--bg);
+body{margin:0;font-family:'Ubuntu',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+  font-size:var(--fs);line-height:1.6;color:var(--ink);background:var(--bg-grad) fixed;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 a{color:var(--accent-2);text-decoration:none} a:hover{text-decoration:underline}
 h1{font-size:26px;font-weight:750;letter-spacing:-.02em;margin:0 0 6px}
