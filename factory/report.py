@@ -115,6 +115,16 @@ def _card(h, runinfo=None):
         warn = (f'<div class="warn">нарушает ограничение из запроса: '
                f'{_esc(", ".join(h.violates_constraints))} — приоритет намеренно занижен, '
                f'но гипотеза не скрыта</div>')
+    fb = getattr(h, "expert_feedback", None)
+    if fb:
+        note = f' — «{_esc(fb["note"])}»' if fb.get("note") else ""
+        novel = (" Совпадает с базой испробованных направлений → не ново."
+                 if fb.get("not_novel") else "")
+        warn += (f'<div class="fb">⚑ фидбэк эксперта: '
+                 f'<b>{_esc(fb.get("verdict", "").replace("_", " "))}</b>{note} · '
+                 f'приоритет ×{fb.get("multiplier", 1)} '
+                 f'({"точное совпадение" if fb.get("tier") == "exact" else "по семейству"}).'
+                 f'{novel} Переранжирована, не скрыта.</div>')
     # плитки металла — по КЛЮЧАМ rec_tonnes (из схемы), а не по зашитым Ni/Cu
     metal_pills = "".join(f'<div class="pill"><b>{v}</b><span>т {_esc(sym)} извлек.</span></div>'
                           for sym, v in (h.metrics.get("rec_tonnes") or {}).items())
@@ -456,6 +466,8 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
   margin-top:12px;font-size:13.5px}}
 .warn{{background:#fff6e9;border:1px solid #f4dcae;border-radius:10px;padding:10px 14px;
   margin-top:10px;font-size:13px;color:#8a5a12}}
+.fb{{background:#f1ecfc;border:1px solid #d9ccf5;border-radius:10px;padding:10px 14px;
+  margin-top:10px;font-size:13px;color:#5b3fa8}}
 table.forms{{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}}
 table.forms th{{text-align:left;color:#9db3bf;font-weight:600;font-size:11px;padding:4px 6px;
   border-bottom:1px solid var(--line)}}

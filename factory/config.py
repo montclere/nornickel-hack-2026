@@ -37,6 +37,12 @@ DEFAULT_CACHE = os.path.join(OUTPUTS_DIR, "kb_cache.json")
 # значения из настоящего явного запуска, с объявлением источника в выводе (см. runconfig.py)
 RUN_CONFIG_PATH = os.path.join(OUTPUTS_DIR, "last_run.json")
 
+# --- фидбэк эксперта (см. feedback.py): человекочитаемая база вердиктов,
+# применяется детерминированным ре-ранком; FACTORY_FEEDBACK=0 — отключить ---
+FEEDBACK_PATH = os.environ.get("FACTORY_FEEDBACK_PATH",
+                               os.path.join(OUTPUTS_DIR, "feedback.json"))
+FEEDBACK_ENABLED = os.environ.get("FACTORY_FEEDBACK", "1") not in ("0", "false", "no", "off")
+
 # --- LLM (Yandex AI Studio) ---
 YANDEX_BASE_URL = os.environ.get(
     "YANDEX_BASE_URL", "https://llm.api.cloud.yandex.net/foundationModels/v1")

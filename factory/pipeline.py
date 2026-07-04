@@ -38,6 +38,11 @@ class HypothesisFactory:
         analysis = analyze(profile, element=intent.target_element)  # кривая раскрытия / формы
         hyps = HypothesisGenerator().generate(profile, kpi=self.kpi)  # диагноз + метрики (детерм.)
 
+        # фидбэк эксперта (outputs/feedback.json, наполняется factory.feedback import):
+        # детерминированный ре-ранк — «уже пробовали»/«неверно» опускаются, не скрываясь
+        from factory.feedback import apply_feedback
+        fb_applied = apply_feedback(hyps, profile.fabric)
+
         used_llm = "нет"
         if self.polish:
             from factory.llm import Phraser
@@ -46,7 +51,7 @@ class HypothesisFactory:
                 hyps = ph.polish(hyps)
                 used_llm = "да (только текст)"
         tech = {"seconds": round(time.perf_counter() - t0, 2), "llm": used_llm,
-                **graph.stats()}
+                "feedback": fb_applied, **graph.stats()}
         html = render(profile, graph.to_layered(), hyps, kpi=self.kpi, tech=tech,
                       analysis=analysis)
         return {"profile": profile, "graph": graph, "analysis": analysis, "intent": intent,
@@ -66,6 +71,10 @@ def main():
     ap.add_argument("--schema", default="", help="путь к JSON-схеме формата отчёта "
                     "(по умолчанию — известный формат; см. schema.py/schema_bootstrap.py)")
     ap.add_argument("--out", default="", help="куда сохранить HTML (по умолчанию рядом)")
+    ap.add_argument("--export", default="", metavar="ФОРМАТЫ",
+                    help="дополнительно выгрузить гипотезы: all либо через запятую из "
+                    "{json,csv,tasks,pdf,docx} (детерминированно, без LLM; "
+                    "см. factory/export.py)")
     args = ap.parse_args()
 
     if not os.path.exists(args.report):
@@ -85,6 +94,9 @@ def main():
           f"{tech['edges']} рёбер · LLM: {tech['llm']}")
     print("=" * 74)
     warn_intent(res["intent"], args.kpi)
+    if tech.get("feedback"):
+        print(f"⚑ применён фидбэк эксперта к {tech['feedback']} гипотезам — приоритеты "
+              f"скорректированы (база: feedback.json, см. factory.feedback)")
     if p.warnings:
         print("ВАЛИДАЦИЯ (парс мог сбиться):")
         for w in p.warnings:
@@ -116,6 +128,7 @@ def main():
 
     if args.out:
         out = args.out
+        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)  # --out в новую папку — не падать
     else:
         os.makedirs(OUTPUTS_DIR, exist_ok=True)
         out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
@@ -123,6 +136,12 @@ def main():
     from factory.glossary import write as write_glossary
     write_glossary(os.path.dirname(out) or ".")   # glossary.html рядом (ссылка из отчёта)
     print(f"HTML-отчёт с графом: {out}  (+ glossary.html рядом)")
+
+    if args.export:
+        from factory.export import export_all
+        print("\nЭКСПОРТ (те же гипотезы, что в HTML — единый слой serialize):")
+        export_all(hyps, profile=p, kpi=args.kpi, formats=args.export,
+                   out_dir=os.path.dirname(out) or OUTPUTS_DIR, log=print)
 
 
 if __name__ == "__main__":

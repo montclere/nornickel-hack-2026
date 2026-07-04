@@ -237,13 +237,18 @@ def main():
             for i, d in enumerate(found, 1):
                 tag = "состояние фабрики" if d.role == "state" else "справочное"
                 print(f"  {i}. novelty={d.novelty} [{tag}] {d.statement_if}")
-            # гипотезы литературы — в отдельный HTML с цитатами/локаторами (файл:страница)
-            if found:
-                from factory.report import render_literature
-                lit_out = os.path.join(OUTPUTS_DIR, "литература_гипотезы.html")
-                open(lit_out, "w", encoding="utf-8").write(render_literature(found, kpi=args.kpi))
-                reports.append(lit_out)
-                print(f"  гипотезы из литературы: {lit_out}")
+            # HTML-отчёт ветки Б (report_kb) — визуальный артефакт с графом; для кейсов без
+            # структурных данных (металлургия: схема+описание+промпт) это ЕДИНСТВЕННЫЙ результат
+            from factory.report_kb import render_kb
+            stats = kg.stats()
+            tech = {"фрагментов": len(prose), "связей в кэше": len(rels),
+                    "узлов графа": stats["nodes"], "рёбер": stats["edges"],
+                    "кэш": cache or "выкл", "запрос к литературе": query}
+            out_kb = os.path.join(OUTPUTS_DIR, "литература_гипотезы.html")
+            open(out_kb, "w", encoding="utf-8").write(
+                render_kb(kg.to_layered(max_nodes=24), found, kpi=args.kpi, tech=tech))
+            reports.append(out_kb)
+            print(f"  HTML-отчёт ветки Б: {out_kb}")
 
     # --- глоссарий рядом с отчётами (ссылка «как читать» в каждом отчёте ведёт сюда) ---
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
