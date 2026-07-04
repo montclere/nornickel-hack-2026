@@ -85,6 +85,7 @@ def _record(h) -> dict:
         "evidence": list(g("evidence", []) or []),
         "sources": list(g("sources", []) or []),
         "violates_constraints": list(g("violates_constraints", []) or []),
+        "literature": list(g("literature", []) or []),   # цитаты из выданного корпуса
         "world_practice": g("world_practice", None),
         "expert_feedback": g("expert_feedback", None),   # вердикт из feedback.json (если был)
         "metrics": dict(g("metrics", {}) or {}),
@@ -320,6 +321,9 @@ def write_pdf(data: dict, path: str) -> str:
         ev = "; ".join(f"{e.get('label','')} [{e.get('cell','')}]" for e in r["evidence"])
         P(f"<b>Заземление (ячейки отчёта):</b> {E(ev)}", "small")
         P(f"<b>Источники метода:</b> {E('; '.join(r['sources']))}", "small")
+        for lq in r.get("literature", []):
+            P(f"<b>База знаний:</b> «{E(lq.get('quote',''))}» "
+              f"[{E(lq.get('locator') or lq.get('source') or '')}]", "small")
         wp = r.get("world_practice")
         if isinstance(wp, dict) and wp.get("url"):
             P(f"<b>Мировая практика:</b> {E(wp.get('practice',''))} — «{E(wp.get('quote',''))}» "
@@ -413,6 +417,10 @@ def write_docx(data: dict, path: str) -> str:
         ev = "; ".join(f"{e.get('label','')} [{e.get('cell','')}]" for e in r["evidence"])
         body.append(_dp([(f"Заземление: {ev} · Источники: {'; '.join(r['sources'])}",
                           False, 18, MUTED)]))
+        for lq in r.get("literature", []):
+            body.append(_dp([(f"База знаний: «{lq.get('quote','')}» "
+                              f"[{lq.get('locator') or lq.get('source') or ''}]",
+                              False, 18, MUTED)], after=30))
         wp = r.get("world_practice")
         if isinstance(wp, dict) and wp.get("url"):
             body.append(_dp([(f"Мировая практика: {wp.get('practice','')} — "

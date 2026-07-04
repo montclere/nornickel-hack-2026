@@ -137,8 +137,21 @@ def _card(h):
       {_roadmap_html(getattr(h, "roadmap", None))}
       <div class="evidence"><b>Заземление (ячейки отчёта):</b>{ev}</div>
       <div class="src"><b>Источники метода:</b><ul>{src}</ul></div>
+      {_literature_html(getattr(h, "literature", None))}
       <div class="wp"><b>Мировая практика:</b>{wp}</div>
     </article>"""
+
+
+def _literature_html(lit):
+    """Подтверждение из ВЫДАННОГО корпуса: дословные цитаты с локатором до страницы
+    (подбирает litsupport.py детерминированно по кэшу извлечения). Нет цитат — блока нет."""
+    if not lit:
+        return ""
+    qs = "".join(
+        f'<blockquote class="litq">«{_esc(e["quote"])}»'
+        f'<span class="litloc">{_esc(e.get("locator") or e.get("source") or "")}</span>'
+        f'</blockquote>' for e in lit)
+    return f'<div class="lit"><b>Подтверждение из базы знаний (выданный корпус):</b>{qs}</div>'
 
 
 def _roadmap_html(rm):
@@ -300,6 +313,10 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .wp p{{margin:4px 0 0}} .wp code{{background:#eef4f7;padding:1px 4px;border-radius:3px}}
 .wpq{{margin:6px 0 4px;padding:6px 10px;border-left:3px solid #12b3ab;background:#f2fbfa;
   color:#2a4550;font-size:12.5px;overflow-wrap:anywhere}}
+.lit{{font-size:12px;margin:10px 0}} .lit>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.litq{{margin:6px 0 4px;padding:6px 10px;border-left:3px solid #1f7ae0;background:#f4f9fe;
+  color:#2a4550;font-size:12.5px;overflow-wrap:anywhere}}
+.litloc{{display:block;margin-top:3px;color:#9db3bf;font-size:11px}}
 .wpsrc{{font-size:11px;color:#9db3bf}} .wpsrc a{{color:#1f7ae0;text-decoration:none}}
 .evidence{{font-size:12px;margin-top:8px}} .evidence>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .ev{{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed var(--line)}}

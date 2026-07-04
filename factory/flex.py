@@ -130,6 +130,7 @@ def main():
 
     # --- ветка 1: детерминированная диагностика хвостов ---
     all_hyps = []
+    fabric_results = []   # (profile, res, путь HTML) — для дообогащения после извлечения
     if tailings and skip_branch_a:
         print("\n" + "─" * 74)
         print(f"ДИАГНОСТИКА ХВОСТОВ ПРОПУЩЕНА: целевого элемента "
@@ -157,6 +158,7 @@ def main():
             os.makedirs(OUTPUTS_DIR, exist_ok=True)
             out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
             open(out, "w", encoding="utf-8").write(res["html"])
+            fabric_results.append((p, res, out))
             top = hyps[0] if hyps else None
             print(f"  ■ {p.fabric}: {len(hyps)} гипотез; топ — {top.statement_if if top else '—'}")
             print(f"    → {out}")
@@ -201,6 +203,22 @@ def main():
         os.makedirs(OUTPUTS_DIR, exist_ok=True)
         rels = extract_relations(chunks, llm=llm, max_chunks=args.max_chunks,
                                  query=query, cache_path=cache, log=lambda m: print("  " + m))
+        # свежие связи корпуса → дообогатить карточки ветки А цитатами литературы и
+        # пересобрать их HTML (при прогоне «с нуля» кэша ещё не было, когда ветка А
+        # рисовала отчёты — pipeline тогда прочитал пустоту; чиним в этом же прогоне)
+        if rels and fabric_results:
+            from factory.litsupport import enrich as lit_enrich
+            from factory.report import render
+            for p, res, out in fabric_results:
+                n = lit_enrich(res["hypotheses"], rels)
+                if n:
+                    open(out, "w", encoding="utf-8").write(
+                        render(p, res["graph"].to_layered(), res["hypotheses"],
+                               kpi=args.kpi, tech=res.get("tech"),
+                               analysis=res.get("analysis")))
+                    print(f"  📚 {p.fabric}: {n} карточек подкреплены цитатами корпуса "
+                          f"(HTML пересобран)")
+
         kg = RelationGraph(rels)
         print(f"канонический граф: {kg.stats()}")
         found = discover(kg, kpi=query, limit=8)

@@ -96,6 +96,10 @@ generator.py карточка ЕСЛИ/ТО/ПОТОМУ ЧТО/ЭКСПЕРИМ
              помимо доминирующей формы класса — «второе направление» по заметной
              недоминирующей форме (≥30% извлекаемого тоннажа): класс редко теряет
              металл по одному механизму
+litsupport.py литературное подкрепление: к карточке детерминированно (стем-матч, ≥2
+             общих корня) подбираются дословные цитаты из ВЫДАННОГО корпуса — из кэша
+             извлечения flex.py, с локатором до страницы. Карточка трёхслойная:
+             числа отчёта + цитата базы знаний + мировая практика. Нет кэша → блока нет
 roadmap.py   дорожная карта эксперимента: лаборатория → пилот (одна секция) → внедрение,
              у каждого этапа критерий перехода го/стоп; методика этапов зависит от
              семейства вмешательства (читаемая таблица, как rules.py)
@@ -357,7 +361,7 @@ KPI НЕ настраивается через env/дефолт — только
 factory/
   schema.py schema_bootstrap.py intent.py               ← конфиг формата + разбор KPI (без LLM в ядре)
   ingest.py extract.py kgraph.py discover.py flex.py report_kb.py  ← гибкая ветка (текст → граф → открытие → HTML)
-  reader.py analysis.py rules.py metrics.py generator.py roadmap.py pipeline.py  ← детерминированная ветка (хвосты)
+  reader.py analysis.py rules.py metrics.py generator.py roadmap.py litsupport.py pipeline.py  ← детерминированная ветка (хвосты)
   export.py feedback.py batch.py                         ← экспорт (PDF/DOCX/CSV/JSON/Jira) + фидбэк-цикл + батч по набору KPI
   config.py llm.py report.py glossary.py evaluate.py benchmark.py judge.py docs/build_guide.py
 materials/   fabrics/<Ф>/ (Хвосты+Гипотезы) · reference/ (books/schemes/regulations)   [вне git]

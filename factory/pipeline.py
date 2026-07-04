@@ -43,6 +43,13 @@ class HypothesisFactory:
         from factory.feedback import apply_feedback
         fb_applied = apply_feedback(hyps, profile.fabric)
 
+        # литературное подкрепление из кэша извлечения (наполняет flex.py): цитаты
+        # выданного корпуса на карточках. Read-only и детерминированно; нет кэша → 0
+        from factory.config import DEFAULT_CACHE
+        from factory.extract import load_cached_relations
+        from factory.litsupport import enrich as lit_enrich
+        lit_n = lit_enrich(hyps, load_cached_relations(DEFAULT_CACHE) or [])
+
         used_llm = "нет"
         if self.polish:
             from factory.llm import Phraser
@@ -51,7 +58,7 @@ class HypothesisFactory:
                 hyps = ph.polish(hyps)
                 used_llm = "да (только текст)"
         tech = {"seconds": round(time.perf_counter() - t0, 2), "llm": used_llm,
-                "feedback": fb_applied, **graph.stats()}
+                "feedback": fb_applied, "literature": lit_n, **graph.stats()}
         html = render(profile, graph.to_layered(), hyps, kpi=self.kpi, tech=tech,
                       analysis=analysis)
         return {"profile": profile, "graph": graph, "analysis": analysis, "intent": intent,

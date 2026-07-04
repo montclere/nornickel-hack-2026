@@ -40,6 +40,7 @@ class Hypothesis:
     violates_constraints: list = field(default_factory=list)  # ограничения из промпта, которые нарушены
     roadmap: list = field(default_factory=list)  # лаборатория→пилот→внедрение с критериями (roadmap.py)
     secondary: bool = False       # второе направление класса (по НЕдоминирующей форме)
+    literature: list = field(default_factory=list)  # цитаты из выданного корпуса (litsupport.py)
     world_practice: str | None = None   # TODO(веб-поиск): подтверждение внедрения в мировой практике
     expert_feedback: dict | None = None  # вердикт эксперта из feedback.json (см. feedback.py)
     metrics: dict = field(default_factory=dict)
