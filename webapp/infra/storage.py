@@ -12,11 +12,15 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 from pathlib import Path
 
 from webapp.config import settings
+
+# формат run_id из new_run_id(); всё прочее (в т.ч. «../../etc») — не run_id
+_RUN_ID_RE = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$")
 
 
 def new_run_id() -> str:
@@ -24,6 +28,11 @@ def new_run_id() -> str:
 
 
 def run_dir(run_id: str) -> Path:
+    """Папка прогона. run_id из URL ВАЛИДИРУЕТСЯ по формату: иначе «../../etc» в
+    run_id читал бы произвольные файлы диска через /report и /status. Невалидный id
+    → заведомо несуществующий путь → все роуты отвечают естественным 404."""
+    if not _RUN_ID_RE.fullmatch(str(run_id or "")):
+        return settings.RUNS_DIR / "__invalid__"
     return settings.RUNS_DIR / run_id
 
 
