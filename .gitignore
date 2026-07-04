@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 *.egg-info/
+.DS_Score
 
 # секреты
 .env

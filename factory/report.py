@@ -91,7 +91,7 @@ def _card(h):
         warn = (f'<div class="warn">⚠ нарушает ограничение из запроса: '
                f'{_esc(", ".join(h.violates_constraints))} — приоритет намеренно занижен, '
                f'но гипотеза не скрыта</div>')
-    wp = h.world_practice or "подключается модуль веб-поиска (пока не реализован)"
+    wp = _world_practice_html(h.world_practice)
     return f"""
     <article class="card">
       <div class="chead">
@@ -122,8 +122,23 @@ def _card(h):
       <div class="exp"><b>Эксперимент:</b><p>{_esc(h.experiment)}</p></div>
       <div class="evidence"><b>Заземление (ячейки отчёта):</b>{ev}</div>
       <div class="src"><b>Источники метода:</b><ul>{src}</ul></div>
-      <div class="wp"><b>Мировая практика:</b><p class="muted">{_esc(wp)}</p></div>
+      <div class="wp"><b>Мировая практика:</b>{wp}</div>
     </article>"""
+
+
+def _world_practice_html(wp):
+    """world_practice: dict {practice,quote,url,site} от веб-поиска, либо None.
+    Показываем резюме + ДОСЛОВНУЮ цитату + кликабельный источник (заземление)."""
+    if not wp:
+        return ('<p class="muted">не искалась — запустите с флагом <code>--web</code> '
+                '(поиск подтверждения в мировой практике с цитатой и ссылкой)</p>')
+    if isinstance(wp, str):        # обратная совместимость
+        return f'<p class="muted">{_esc(wp)}</p>'
+    url, site = _esc(wp.get("url", "")), _esc(wp.get("site", "источник"))
+    return (f'<p>{_esc(wp.get("practice", ""))}</p>'
+            f'<blockquote class="wpq">«{_esc(wp.get("quote", ""))}»</blockquote>'
+            f'<div class="wpsrc">источник: <a href="{url}" target="_blank" '
+            f'rel="noopener">{site}</a></div>')
 
 
 def _liberation_svg(lib):
@@ -240,7 +255,10 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .src{{font-size:12px;margin:10px 0}} .src b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .src ul{{margin:5px 0 0;padding-left:18px;color:#37505c}} .src li{{margin:2px 0}}
 .wp{{font-size:12px;margin:10px 0}} .wp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
-.wp p{{margin:4px 0 0;font-style:italic}}
+.wp p{{margin:4px 0 0}} .wp code{{background:#eef4f7;padding:1px 4px;border-radius:3px}}
+.wpq{{margin:6px 0 4px;padding:6px 10px;border-left:3px solid #12b3ab;background:#f2fbfa;
+  color:#2a4550;font-size:12.5px;overflow-wrap:anywhere}}
+.wpsrc{{font-size:11px;color:#9db3bf}} .wpsrc a{{color:#1f7ae0;text-decoration:none}}
 .evidence{{font-size:12px;margin-top:8px}} .evidence>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .ev{{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed var(--line)}}
 .ev em{{color:#9db3bf;font-style:normal}}

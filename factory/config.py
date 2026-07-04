@@ -59,6 +59,25 @@ FRAGMENT_RETRY_ATTEMPTS = int(os.environ.get("FACTORY_FRAGMENT_RETRIES", "2"))
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", YANDEX_MODEL)
 JUDGE_CACHE = os.path.join(OUTPUTS_DIR, "judge_cache.json")
 
+# --- Веб-поиск мировых практик (ветка «world_practice») ---
+# Ищем внешнее подтверждение вмешательства в ПРОМЫШЛЕННОЙ практике обогащения.
+# Тот же принцип детерминизма, что и везде: результат несёт URL + дословную цитату
+# и кэшируется по отпечатку запроса → воспроизводимо и заземлено (не выдумка LLM).
+WEB_SEARCH_ENABLED = os.environ.get("FACTORY_WEB", "1") not in ("0", "false", "no", "off")
+WEB_SEARCH_BACKEND = os.environ.get("WEB_BACKEND", "ddg")   # ddg (без ключа) | yandex
+WEB_MAX_RESULTS = int(os.environ.get("WEB_MAX_RESULTS", "6"))   # сколько ссылок тянуть на запрос
+WEB_MAX_HYPS = int(os.environ.get("WEB_MAX_HYPS", "5"))        # для скольких топ-гипотез искать
+WEB_FETCH_TIMEOUT = int(os.environ.get("WEB_FETCH_TIMEOUT", "12"))
+WEB_PAGE_CHARS = int(os.environ.get("WEB_PAGE_CHARS", "4000"))  # сколько текста страницы в LLM
+WEB_CACHE = os.path.join(OUTPUTS_DIR, "web_cache.json")
+# промышленные/материаловедческие домены — их поднимаем в выдаче (сайты вроде MITS NIMS,
+# профильные журналы, вендоры оборудования). Переопределяется через env (запятыми).
+WEB_INDUSTRIAL_DOMAINS = [s.strip() for s in os.environ.get(
+    "WEB_DOMAINS",
+    "nims.go.jp,saimm.co.za,mdpi.com,sciencedirect.com,springer.com,researchgate.net,"
+    "onemine.org,metso.com,mogroup.com,ceecthefuture.org,911metallurgist.com,"
+    "tandfonline.com,osti.gov,doi.org").split(",") if s.strip()]
+
 # --- OCR (Yandex Vision) — картинки и сканы PDF → текст ---
 OCR_ENABLED = os.environ.get("FACTORY_OCR", "1") not in ("0", "false", "no", "off")
 OCR_BASE_URL = os.environ.get("YANDEX_OCR_URL", "https://ocr.api.cloud.yandex.net")

@@ -65,6 +65,9 @@ def main():
     ap.add_argument("--max-chunks", type=int, default=14)
     ap.add_argument("--cache", default=DEFAULT_CACHE)
     ap.add_argument("--no-cache", action="store_true")
+    ap.add_argument("--web", action="store_true",
+                    help="искать в интернете мировые практики (заполняет world_practice "
+                    "гипотез внешней цитатой + URL; кэшируется, требует ключа Yandex)")
     ap.add_argument("--run-config", default=RUN_CONFIG_PATH,
                     help="куда сохранить конфиг этого запуска (KPI+параметры) — его "
                     "подхватят benchmark/judge, если им не передать свой --kpi")
@@ -108,6 +111,16 @@ def main():
     print(f"\nотчётов по хвостам (ветка А, состояние конкретных фабрик): {len(tailings)}")
     print(f"прочих материалов (ветка Б, знание): {len(others)}")
 
+    # --- необязательный веб-поиск мировых практик (заполняет world_practice) ---
+    web = None
+    if args.web:
+        from factory.websearch import WebPractices
+        web = WebPractices(log=lambda m: print("  " + m))
+        if not web.ready:
+            print("\n⚠ --web запрошен, но веб-поиск недоступен (нет ключа Yandex или "
+                  "FACTORY_WEB=0) — world_practice останется пустым.")
+            web = None
+
     # --- ветка 1: детерминированная диагностика хвостов ---
     all_hyps = []
     if tailings:
@@ -119,6 +132,15 @@ def main():
             res = HypothesisFactory(t, kpi=args.kpi).run()
             p, hyps = res["profile"], res["hypotheses"]
             all_hyps.extend(hyps)
+            # обогащаем мировыми практиками ДО отрисовки HTML — иначе в отчёт попадёт
+            # пустой плейсхолдер; заодно html пересобираем уже с найденными цитатами
+            if web:
+                print(f"  · веб-поиск мировых практик для «{p.fabric}»…")
+                web.enrich(hyps, extra=_diagnosis_query_terms(hyps))
+                from factory.report import render
+                res["html"] = render(p, res["graph"].to_layered(), hyps,
+                                     kpi=args.kpi, tech=res.get("tech"),
+                                     analysis=res.get("analysis"))
             os.makedirs(OUTPUTS_DIR, exist_ok=True)
             out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
             open(out, "w", encoding="utf-8").write(res["html"])
