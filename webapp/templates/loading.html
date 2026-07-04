@@ -8,6 +8,7 @@
   <ol class="steps" id="steps">
     <li data-step="Приём материалов"><i></i>Приём материалов</li>
     <li data-step="Диагностика отчётов"><i></i>Диагностика отчётов</li>
+    <li data-step="Поиск в интернете"><i></i>Поиск в интернете</li>
     <li data-step="Чтение литературы"><i></i>Чтение литературы</li>
     <li data-step="Сборка отчётов"><i></i>Сборка отчётов</li>
   </ol>
@@ -31,13 +32,16 @@
     const cur = st.current || "";
     nowEl.textContent = cur + "…";
     const idx = names.indexOf(cur);
+    const seen = new Set(st.log || []);      // этапы, которые РЕАЛЬНО выполнялись
     steps.forEach((li, i) => {
+      const name = li.dataset.step;
       li.className = "";
-      if (st.done && !st.error) li.className = "done";
-      else if (idx >= 0 && i < idx) li.className = "done";
+      if (st.done && !st.error)              // финал: галочка только выполненным,
+        li.className = seen.has(name) ? "done" : "skip";   // остальным — «пропущено»
       else if (i === idx) li.className = "act";
+      else if (idx >= 0 && i < idx) li.className = seen.has(name) ? "done" : "skip";
     });
-    // последние строки хода работы (без дублей подряд)
+    // последние строки хода работы
     const log = (st.log || []).slice(-6);
     logEl.innerHTML = log.map(l => `<div>${l}</div>`).join("");
   }

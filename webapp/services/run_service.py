@@ -82,17 +82,27 @@ class RunService:
 
         fabrics, all_hyps, reports = [], [], []
         if tailings and not skip_a:
+            # три прохода вместо одного перемешанного: этапы на экране загрузки
+            # соответствуют тому, что реально происходит (диагностика → веб → рендер)
             progress("Диагностика отчётов")
+            diagnosed = []
             for t in tailings:
                 res = HypothesisFactory(t, kpi=kpi).run()
-                p, hyps = res["profile"], res["hypotheses"]
-                all_hyps.extend(hyps)
-                if web:
-                    log(f"веб-практики — {p.fabric}")
-                    web.enrich(hyps, extra=_diagnosis_terms(hyps))
-                if dos:
-                    log(f"досье OpenAlex — {p.fabric}")
-                    dos.enrich(hyps)
+                diagnosed.append((res["profile"], res))
+                all_hyps.extend(res["hypotheses"])
+                log(f"диагностика — {res['profile'].fabric}")
+            if diagnosed and (web or dos):
+                progress("Поиск в интернете")
+                for p, res in diagnosed:
+                    hyps = res["hypotheses"]
+                    if web:
+                        log(f"веб-практики — {p.fabric}")
+                        web.enrich(hyps, extra=_diagnosis_terms(hyps))
+                    if dos:
+                        log(f"досье OpenAlex — {p.fabric}")
+                        dos.enrich(hyps)
+            for p, res in diagnosed:
+                hyps = res["hypotheses"]
                 runinfo = {"web": bool(web), "dossier": bool(dos)}
                 html = render(p, res["graph"].to_layered(), hyps, kpi=kpi,
                               tech=res.get("tech"), analysis=res.get("analysis"),

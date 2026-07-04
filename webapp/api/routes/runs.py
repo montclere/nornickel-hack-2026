@@ -27,10 +27,17 @@ def _job(run_id, kpi, web_search, use_llm, max_chunks, llm, search):
         st["done"] = False
         storage.save_json(run_id, "status.json", st)
 
+    def detail(text):
+        """Мелкие строки хода работы (какая фабрика, что ищем) — в лог экрана
+        загрузки, НЕ меняя текущий этап."""
+        st = storage.load_json(run_id, "status.json") or {"log": []}
+        st.setdefault("log", []).append(str(text))
+        storage.save_json(run_id, "status.json", st)
+
     try:
         RunService(llm=llm, search=search).run(
             run_id, kpi, web_search=web_search, use_llm=use_llm,
-            max_chunks=max_chunks, progress=progress)
+            max_chunks=max_chunks, progress=progress, log=detail)
         st = storage.load_json(run_id, "status.json") or {}
         st.update({"current": "Готово", "done": True, "redirect": f"/runs/{run_id}"})
         storage.save_json(run_id, "status.json", st)

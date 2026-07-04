@@ -130,6 +130,8 @@ code{background:var(--line-2);padding:1px 5px;border-radius:5px;font-size:.88em}
 .steps li.done i{background:var(--accent);border-color:var(--accent)}
 .steps li.done i::after{content:"";position:absolute;left:5.5px;top:2.5px;width:4px;height:8px;
   border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.steps li.skip{color:var(--faint);text-decoration:line-through;opacity:.65}
+.steps li.skip i{border-style:dashed}
 .load-now{margin:18px 0 6px;font-size:14px;color:var(--accent-ink);font-weight:600;min-height:1.3em}
 .load-log{font-size:12px;color:var(--faint);min-height:3em;line-height:1.7}
 .load-back{display:inline-block;margin-top:22px;font-size:12.5px;color:var(--muted)}
