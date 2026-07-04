@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Анализ идёт…{% endblock %}
+{% block content %}
+<div class="load-wrap">
+  <h1>Строим гипотезы</h1>
+  <p class="sub">Можно оставить страницу открытой — по завершении откроются результаты.</p>
+
+  <ol class="steps" id="steps">
+    <li data-step="Приём материалов"><i></i>Приём материалов</li>
+    <li data-step="Диагностика отчётов"><i></i>Диагностика отчётов</li>
+    <li data-step="Чтение литературы"><i></i>Чтение литературы</li>
+    <li data-step="Сборка отчётов"><i></i>Сборка отчётов</li>
+  </ol>
+
+  <div class="load-now" id="now">запускаем…</div>
+  <div class="load-log" id="log"></div>
+  <div class="warn" id="err" hidden></div>
+  <a class="load-back" href="/">← отменить и вернуться</a>
+</div>
+
+<script>
+(function () {
+  const runId = {{ run_id | tojson }};
+  const steps = Array.from(document.querySelectorAll("#steps li"));
+  const nowEl = document.getElementById("now");
+  const logEl = document.getElementById("log");
+  const errEl = document.getElementById("err");
+  const names = steps.map(li => li.dataset.step);
+
+  function paint(st) {
+    const cur = st.current || "";
+    nowEl.textContent = cur + "…";
+    const idx = names.indexOf(cur);
+    steps.forEach((li, i) => {
+      li.className = "";
+      if (st.done && !st.error) li.className = "done";
+      else if (idx >= 0 && i < idx) li.className = "done";
+      else if (i === idx) li.className = "act";
+    });
+    // последние строки хода работы (без дублей подряд)
+    const log = (st.log || []).slice(-6);
+    logEl.innerHTML = log.map(l => `<div>${l}</div>`).join("");
+  }
+
+  async function tick() {
+    try {
+      const r = await fetch(`/api/runs/${runId}/status`);
+      if (!r.ok) throw new Error("статус недоступен");
+      const st = await r.json();
+      paint(st);
+      if (st.done) {
+        if (st.error) {
+          errEl.hidden = false;
+          errEl.textContent = "не получилось: " + st.error;
+          nowEl.textContent = "остановлено";
+          return;                                  // поллинг больше не нужен
+        }
+        nowEl.textContent = "готово — открываем результаты…";
+        window.location.href = st.redirect || `/runs/${runId}`;
+        return;
+      }
+    } catch (e) { /* временный сбой сети — просто попробуем ещё раз */ }
+    setTimeout(tick, 1200);
+  }
+  tick();
+})();
+</script>
+{% endblock %}

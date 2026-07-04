@@ -7,25 +7,27 @@
 
 <form id="run-form" class="card-form">
   <div class="dropzones">
-    <div class="dz" data-role="data">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
-           stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/>
-        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-      <div class="dz-title">Данные фабрики</div>
-      <div class="dz-hint">отчёт по хвостам (<code>.xlsx</code>), схемы и регламенты фабрики</div>
-      <input type="file" class="dz-input" multiple
-             accept=".xlsx,.csv,.pdf,.docx,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp">
-      <ul class="dz-list"></ul>
+    <div class="dzcol">
+      <div class="dz" data-role="data">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/>
+          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <div class="dz-title">Данные фабрики</div>
+        <div class="dz-hint">отчёт по хвостам (<code>.xlsx</code>), схемы и регламенты фабрики</div>
+        <input type="file" class="dz-input" multiple>
+      </div>
+      <ul class="dz-list" data-list="data"></ul>
     </div>
-    <div class="dz" data-role="knowledge">
-      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
-           stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>
-        <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
-      <div class="dz-title">Литература</div>
-      <div class="dz-hint">справочники, статьи, методички</div>
-      <input type="file" class="dz-input" multiple
-             accept=".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.tif,.tiff,.webp,.bmp">
-      <ul class="dz-list"></ul>
+    <div class="dzcol">
+      <div class="dz" data-role="knowledge">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>
+          <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
+        <div class="dz-title">Литература</div>
+        <div class="dz-hint">справочники, статьи, методички</div>
+        <input type="file" class="dz-input" multiple>
+      </div>
+      <ul class="dz-list" data-list="knowledge"></ul>
     </div>
   </div>
 
@@ -42,9 +44,20 @@
   </label>
 
   <div class="flags">
-    <label><input type="checkbox" id="dossier" checked> Научные статьи</label>
-    <label><input type="checkbox" id="web"> Поиск в интернете</label>
+    <label class="sw"><input type="checkbox" id="web_search" checked><i></i>
+      <span>Веб-поиск <em>научные статьи и подтверждение практикой</em></span></label>
+    <label class="sw"><input type="checkbox" id="use_llm" checked><i></i>
+      <span>LLM <em>чтение литературы и сканов</em></span></label>
   </div>
+
+  <details class="adv">
+    <summary>Дополнительно</summary>
+    <label class="fld">
+      <span>Фрагментов литературы за запуск</span>
+      <input type="number" id="max_chunks" value="14" min="2" max="60" step="1">
+      <small>сколько фрагментов текста читает LLM; больше — дольше и дороже</small>
+    </label>
+  </details>
 
   <button type="submit" id="go">Построить гипотезы</button>
   <div id="status" class="status"></div>

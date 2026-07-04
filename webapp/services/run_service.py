@@ -82,6 +82,7 @@ class RunService:
 
         fabrics, all_hyps, reports = [], [], []
         if tailings and not skip_a:
+            progress("Диагностика отчётов")
             for t in tailings:
                 res = HypothesisFactory(t, kpi=kpi).run()
                 p, hyps = res["profile"], res["hypotheses"]
@@ -105,10 +106,12 @@ class RunService:
         lit_report = None
         llm_ok = bool(self.llm and self.llm.ready and self.llm.probe())
         if others and llm_ok:
+            progress("Чтение литературы")
             lit_report = self._branch_b(rd, kpi, intent, others, fabrics, log)
         elif others and not llm_ok:
             log("LLM недоступен — ветка Б пропущена (хвосты/досье/веб готовы)")
 
+        progress("Сборка отчётов")
         write_glossary(str(rd))
 
         # --- сериализация для рендера карточек + контекст + метрики ---
@@ -151,7 +154,8 @@ class RunService:
         extra = _diagnosis_terms([h for _, hs, _ in fabrics for h in hs])
         query = f"{kpi} {extra}".strip() if extra else kpi
         cache = str(rd / "kb_cache.json")
-        rels = extract_relations(chunks, llm=self.llm, max_chunks=14,
+        rels = extract_relations(chunks, llm=self.llm,
+                                 max_chunks=getattr(self, "_max_chunks", 14),
                                  query=query, cache_path=cache, log=log)
 
         # подкрепить карточки ветки А цитатами корпуса и пересобрать их HTML

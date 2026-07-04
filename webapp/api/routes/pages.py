@@ -21,6 +21,14 @@ def index(request: Request):
     return TEMPLATES.TemplateResponse(request, "index.html", {"runs": storage.list_runs()})
 
 
+@router.get("/runs/{run_id}/loading", response_class=HTMLResponse)
+def loading_page(request: Request, run_id: str):
+    """Экран хода анализа: этапы обновляются поллингом /api/runs/{id}/status."""
+    if not storage.run_exists(run_id):
+        raise HTTPException(404, "запуск не найден")
+    return TEMPLATES.TemplateResponse(request, "loading.html", {"run_id": run_id})
+
+
 @router.get("/runs/{run_id}", response_class=HTMLResponse)
 def run_page(request: Request, run_id: str, rs=Depends(get_report_service)):
     if not storage.run_exists(run_id):

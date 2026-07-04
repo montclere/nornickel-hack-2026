@@ -1,8 +1,8 @@
-// Локальный UI: health-бейдж, drag-n-drop (файлы И ПАПКИ из файловой системы), сабмит.
+// Локальный UI: health-бейдж, drag-n-drop (файлы И ПАПКИ), сабмит.
 (function () {
-  const ALLOWED = new Set(["xlsx", "csv", "pdf", "docx", "txt", "md",
-    "png", "jpg", "jpeg", "tif", "tiff", "webp", "bmp"]);
-  const extOk = n => { const i = n.lastIndexOf("."); return i >= 0 && ALLOWED.has(n.slice(i + 1).toLowerCase()); };
+  // тип файла не режем на фронте — система сама решает, что парсить;
+  // пропускаем только скрытые/служебные (.DS_Store и т.п.)
+  const fileOk = n => { const b = n.split("/").pop(); return b && !b.startsWith("."); };
 
   // --- health ---
   const hEl = document.getElementById("health");
@@ -23,7 +23,7 @@
   function readEntry(entry, out) {
     return new Promise(res => {
       if (entry.isFile) {
-        entry.file(f => { if (extOk(f.name)) out.push(f); res(); }, () => res());
+        entry.file(f => { if (fileOk(f.name)) out.push(f); res(); }, () => res());
       } else if (entry.isDirectory) {
         const reader = entry.createReader();
         const batch = () => reader.readEntries(async ents => {
@@ -41,28 +41,30 @@
     const entries = dt.items ? Array.from(dt.items)
       .map(it => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean) : [];
     if (entries.length) { for (const en of entries) await readEntry(en, out); }
-    else { for (const f of dt.files) if (extOk(f.name)) out.push(f); }  // fallback
+    else { for (const f of dt.files) if (fileOk(f.name)) out.push(f); }  // fallback
     return out;
   }
 
   document.querySelectorAll(".dz").forEach(dz => {
     const role = dz.dataset.role;
     const input = dz.querySelector(".dz-input");
-    const list = dz.querySelector(".dz-list");
+    // список живёт ВНЕ зоны дропа: клики по нему физически не задевают зону —
+    // удаление файла больше не открывает диалог выбора
+    const list = document.querySelector(`.dz-list[data-list="${role}"]`);
     const render = () => {
       list.innerHTML = zoneFiles[role].map((f, i) =>
         `<li>${f.name}<button type="button" class="dz-x" data-i="${i}" title="убрать">×</button></li>`).join("")
-        + (zoneFiles[role].length ? `<button type="button" class="dz-clear">очистить (${zoneFiles[role].length})</button>` : "");
+        + (zoneFiles[role].length > 1
+           ? `<li class="dz-tools"><button type="button" class="dz-clear">очистить все (${zoneFiles[role].length})</button></li>` : "");
     };
     const add = files => {
       const seen = new Set(zoneFiles[role].map(f => f.name + f.size));
-      for (const f of files) if (extOk(f.name) && !seen.has(f.name + f.size)) {
+      for (const f of files) if (fileOk(f.name) && !seen.has(f.name + f.size)) {
         zoneFiles[role].push(f); seen.add(f.name + f.size);
       }
       render();
     };
-    // клик по зоне → диалог выбора; клики по списку/кнопкам не открывают диалог
-    dz.addEventListener("click", e => { if (!e.target.closest(".dz-list")) input.click(); });
+    dz.addEventListener("click", () => input.click());
     input.addEventListener("change", () => { add(input.files); input.value = ""; });
     list.addEventListener("click", e => {
       if (e.target.classList.contains("dz-x")) { zoneFiles[role].splice(+e.target.dataset.i, 1); render(); }
@@ -92,13 +94,14 @@
     const constraints = document.getElementById("constraints").value.trim();
     const fd = new FormData();
     fd.append("kpi", constraints ? `${kpi} ${constraints}` : kpi);
-    fd.append("dossier", document.getElementById("dossier").checked);
-    fd.append("web", document.getElementById("web").checked);
+    fd.append("web_search", document.getElementById("web_search").checked);
+    fd.append("use_llm", document.getElementById("use_llm").checked);
+    fd.append("max_chunks", document.getElementById("max_chunks").value || "14");
     zoneFiles.data.forEach(f => fd.append("data_files", f, f.name));
     zoneFiles.knowledge.forEach(f => fd.append("knowledge_files", f, f.name));
 
     go.disabled = true; statusEl.className = "status busy";
-    statusEl.textContent = "анализируем данные — может занять пару минут…";
+    statusEl.textContent = "загружаем файлы…";
     try {
       const r = await fetch("/api/runs", { method: "POST", body: fd });
       if (!r.ok) { const t = await r.json().catch(() => ({})); throw new Error(t.detail || `ошибка ${r.status}`); }
