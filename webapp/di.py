@@ -21,11 +21,14 @@ def get_llm() -> LLMClient:
 
 
 def get_search() -> SearchClient:
-    if settings.SEARCH_BACKEND == "yandex":
+    """Поиск: Yandex Search API — ОСНОВНОЙ (когда есть ключ), DDG — фолбэк.
+    Фолбэк двухуровневый: здесь (нет ключа → DDG) и в рантайме внутри
+    smart_search (ошибка/пустая выдача Yandex → DDG на каждом запросе)."""
+    if settings.SEARCH_BACKEND != "ddg":     # "auto"/"yandex": предпочесть Yandex
         ys = YandexSearch()
         if ys.available:
             return ys
-    return DdgSearch()             # дефолт/фолбэк — без ключа
+    return DdgSearch()             # явный ddg или нет ключа
 
 
 def get_run_service(llm: LLMClient = None, search: SearchClient = None):

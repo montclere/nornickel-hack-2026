@@ -1,26 +1,22 @@
 # -*- coding: utf-8 -*-
-"""Заглушка Yandex Search API под контракт SearchClient — точка замены DDG на надёжный
-поиск. Реализовать `search()` (endpoint https://searchapi.api.cloud.yandex.net/... через
-factory.client.get_json/post_json) и подставить в DI (WEBAPP_SEARCH=yandex). Пока не
-готово → available=False, DI откатывается на DDG."""
+"""Yandex Search API как ОСНОВНОЙ поиск (официальный REST вместо скрейпинга) с
+фолбэком на DuckDuckGo. Реализация живёт в factory.websearch (smart_search) — её же
+использует CLI (flex --web); этот адаптер лишь оборачивает под контракт SearchClient."""
 from __future__ import annotations
 
-import os
+from factory.websearch import smart_search, yandex_search_ready
 
 
 class YandexSearch:
-    name = "yandex-search"
+    """Yandex Search API → при ошибке/пустой выдаче внутри smart_search — DDG."""
 
-    def __init__(self, api_key: str | None = None, folder: str | None = None):
-        self.api_key = api_key or os.environ.get("YANDEX_SEARCH_KEY")
-        self.folder = folder or os.environ.get("YANDEX_FOLDER_ID")
+    @property
+    def name(self) -> str:
+        return "yandex (+ddg фолбэк)" if yandex_search_ready() else "duckduckgo"
 
     @property
     def available(self) -> bool:
-        # включим, когда реализуем search(); пока False → DI берёт DDG
-        return False
+        return yandex_search_ready()      # ключ+folder есть → можно ставить основным
 
     def search(self, query: str, n: int) -> list:
-        raise NotImplementedError(
-            "Yandex Search API ещё не подключён — подставьте ключ и реализуйте запрос "
-            "к searchapi.api.cloud.yandex.net (через factory.client), затем available=True")
+        return smart_search(query, n)

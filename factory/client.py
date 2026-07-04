@@ -141,7 +141,7 @@ def _retry_after(err):
 
 
 def request(url, *, source, method="GET", data=None, headers=None, timeout=30,
-            max_retries=LLM_MAX_RETRIES, parse="json"):
+            max_retries=LLM_MAX_RETRIES, parse="json", max_bytes=None, accept_types=None):
     """Единый исходящий запрос с ретраями/backoff/джиттером, предохранителем и телеметрией.
 
     parse: "json" | "text" | "bytes". Бросает исключение после исчерпания ретраев или
@@ -159,7 +159,14 @@ def request(url, *, source, method="GET", data=None, headers=None, timeout=30,
     for attempt in range(max_retries + 1):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
-                raw = r.read()
+                # accept_types: чужой Content-Type (например application/pdf при
+                # ожидании text/html) → не читаем тело вовсе, экономим десятки секунд
+                if accept_types and not str(r.headers.get_content_type() or "")\
+                        .startswith(tuple(accept_types)):
+                    TELEMETRY.record(source, latency_ms=(time.time()-t0)*1000, retries=attempt)
+                    _BREAKER.ok(source)
+                    return "" if parse == "text" else (b"" if parse == "bytes" else {})
+                raw = r.read(max_bytes) if max_bytes else r.read()
             dt = (time.time() - t0) * 1000
             out = (json.loads(raw.decode("utf-8")) if parse == "json"
                    else raw.decode(r.headers.get_content_charset() or "utf-8", "ignore")
@@ -195,9 +202,11 @@ def get_json(url, headers=None, timeout=30, source="http", max_retries=3):
                    max_retries=max_retries, parse="json")
 
 
-def get_text(url, headers=None, timeout=30, source="http", max_retries=2):
+def get_text(url, headers=None, timeout=30, source="http", max_retries=2,
+             max_bytes=None, accept_types=None):
     return request(url, source=source, headers=headers, timeout=timeout,
-                   max_retries=max_retries, parse="text")
+                   max_retries=max_retries, parse="text", max_bytes=max_bytes,
+                   accept_types=accept_types)
 
 
 def record_tokens(source, resp):

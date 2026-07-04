@@ -82,7 +82,13 @@ WEB_SEARCH_ENABLED = os.environ.get("FACTORY_WEB", "1") not in ("0", "false", "n
 WEB_SEARCH_BACKEND = os.environ.get("WEB_BACKEND", "ddg")   # ddg (без ключа) | yandex
 WEB_MAX_RESULTS = int(os.environ.get("WEB_MAX_RESULTS", "8"))   # сколько ссылок тянуть на запрос
 WEB_MAX_HYPS = int(os.environ.get("WEB_MAX_HYPS", "6"))        # для скольких топ-гипотез искать
-WEB_FETCH_TIMEOUT = int(os.environ.get("WEB_FETCH_TIMEOUT", "12"))
+WEB_FETCH_TIMEOUT = int(os.environ.get("WEB_FETCH_TIMEOUT", "6"))   # медленный сайт не ждём
+# параллельность веб-поиска: страницы качаются пулом (время = максимум, не сумма),
+# гипотезы обогащаются несколькими воркерами; результат детерминирован — кандидаты
+# обрабатываются в исходном порядке ранжирования независимо от порядка скачивания
+WEB_FETCH_WORKERS = int(os.environ.get("WEB_FETCH_WORKERS", "8"))
+WEB_HYP_WORKERS = int(os.environ.get("WEB_HYP_WORKERS", "3"))
+WEB_PER_DOMAIN = int(os.environ.get("WEB_PER_DOMAIN", "2"))   # не больше N страниц с домена
 WEB_PAGE_CHARS = int(os.environ.get("WEB_PAGE_CHARS", "4000"))  # сколько текста страницы в LLM
 # гейт КАЧЕСТВА цитаты (поверх дословного гейта): цитата обязана быть предложением из
 # основного текста, а не заголовком/названием страницы — см. websearch._quote_quality

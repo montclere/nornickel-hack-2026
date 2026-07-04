@@ -16,7 +16,7 @@ class Settings:
     DEFAULT_MAX_CHUNKS = int(os.environ.get("WEBAPP_MAX_CHUNKS", "14"))  # окно ветки Б (правится в форме)
 
     # какой поисковый бэкенд подсунуть в DI: ddg (без ключа) | yandex (нужен ключ)
-    SEARCH_BACKEND = os.environ.get("WEBAPP_SEARCH", "ddg")
+    SEARCH_BACKEND = os.environ.get("WEBAPP_SEARCH", "auto")  # auto: yandex если есть ключ, иначе ddg
 
     # НЕ публичный сервис: без аутентификации, изоляция только по непубличному run_id.
     # Данные фабрик наружу не отправляются (наружу — только термины запроса к
