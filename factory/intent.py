@@ -46,13 +46,30 @@ _ELEMENT_SYNONYMS = {
 _REDUCE_WORDS = [r"снизит", r"сократит", r"уменьшит", r"снижени", r"потер", r"reduce", r"loss", r"lower"]
 _INCREASE_WORDS = [r"повысит", r"увеличит", r"поднят", r"извлечени", r"improve", r"increase", r"recover"]
 
-# фраза-ограничение в тексте → что она значит для фильтрации (сейчас — одна, самая
-# частая по формулировке кейса; список расширяется по мере появления новых кейсов)
-_NO_EQUIPMENT_PHRASES = [
-    "без нового оборудования", "без установки нового оборудования",
-    "без закупки оборудования", "существующим оборудованием",
-    "без капитальных затрат", "без capex", "no new equipment",
+# Реестр ограничений: (tag, [подстроки], kind). kind решает, какие гипотезы конфликтуют:
+#   equipment  — требующие НОВОГО оборудования (diag.needs_equipment);
+#   reagent    — меняющие реагентный режим (семейство «реагентный режим / кинетика флотации»);
+#   quality/throughput — «мягкие» цели: фиксируем и показываем, но НЕ штрафуем (нечем
+#                детерминированно доказать вред качеству/производительности конкретной гипотезы).
+# Расширяется добавлением строки — без правок ядра. Всё детерминированно (без LLM).
+_CONSTRAINTS = [
+    ("без нового оборудования",
+     ["без нового оборудован", "без установки нового оборудован", "без закупки оборудован",
+      "существующим оборудован", "без капитальных затрат", "без капзатрат", "без capex",
+      "минимум капзатрат", "no new equipment"], "equipment"),
+    ("без новых реагентов",
+     ["без новых реагент", "без закупки реагент", "существующими реагент",
+      "не менять реагент", "без смены реагент", "без новой химии"], "reagent"),
+    ("сохранить качество концентрата",
+     ["сохранить качество концентрат", "без потери качеств", "не снижая качеств",
+      "не ухудшая качеств", "без снижения качеств", "не в ущерб качеству"], "quality"),
+    ("без снижения производительности",
+     ["без снижения производительн", "не снижая производительн", "сохранить производительн",
+      "без потери производительн"], "throughput"),
 ]
+
+# семейство, конфликтующее с ограничением «без новых реагентов» (из rules.py)
+REAGENT_FAMILY = "реагентный режим / кинетика флотации"
 
 
 @dataclass
@@ -63,8 +80,9 @@ class Intent:
     element_in_schema: bool = True                # False — металл упомянут, но его нет в схеме отчёта
     requested_element: str | None = None          # что реально упомянуто (может быть вне схемы, напр. Pt)
     direction: str = "improve"                    # improve | reduce — только для прозрачности
-    no_new_equipment: bool = False                # запрет на вмешательства с новым оборудованием
-    matched_constraints: list = field(default_factory=list)  # что распознано (для прозрачности)
+    no_new_equipment: bool = False                # (совместимость) запрет нового оборудования
+    matched_constraints: list = field(default_factory=list)  # теги распознанных ограничений
+    constraints: list = field(default_factory=list)          # [{"tag","kind"}] — для генератора
     mentioned_elements: list = field(default_factory=list)   # все распознанные металлы (могут быть вне схемы)
 
 
@@ -125,9 +143,24 @@ def parse_intent(kpi: str, schema_symbols=ELEMENT_SYMBOLS) -> Intent:
 
     direction = "reduce" if (any(re.search(w, low) for w in _REDUCE_WORDS)
                              and not any(re.search(w, low) for w in _INCREASE_WORDS)) else "improve"
-    hits = [p for p in _NO_EQUIPMENT_PHRASES if p in low]
+    cons = [{"tag": tag, "kind": kind} for tag, pats, kind in _CONSTRAINTS
+            if any(p in low for p in pats)]
 
     return Intent(kpi_text=kpi, target_element=element, element_detected=detected,
                   element_in_schema=elem_in_schema, requested_element=requested,
-                  direction=direction, no_new_equipment=bool(hits),
-                  matched_constraints=hits, mentioned_elements=mentioned)
+                  direction=direction,
+                  no_new_equipment=any(c["kind"] == "equipment" for c in cons),
+                  matched_constraints=[c["tag"] for c in cons], constraints=cons,
+                  mentioned_elements=mentioned)
+
+
+def constraint_violations(intent: "Intent", family: str, needs_equipment: bool) -> list:
+    """Какие ограничения нарушает гипотеза (по семейству и потребности в оборудовании).
+    Только «жёсткие» (equipment/reagent); quality/throughput — цели, не штрафуются."""
+    v = []
+    for c in getattr(intent, "constraints", None) or []:
+        if c["kind"] == "equipment" and needs_equipment:
+            v.append(c["tag"])
+        elif c["kind"] == "reagent" and family == REAGENT_FAMILY:
+            v.append(c["tag"])
+    return v

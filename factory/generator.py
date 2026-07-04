@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from factory.config import SECONDARY_MIN_SHARE
-from factory.intent import Intent, parse_intent
+from factory.intent import Intent, constraint_violations, parse_intent
 from factory.metrics import Scorer
 from factory.reader import ELEMENT_SYMBOLS
 from factory.roadmap import build_roadmap
@@ -112,13 +112,10 @@ class HypothesisGenerator:
             evidence.append({"label": f"форма «{dom}» ({round(domf.pct,1)}%)",
                              "cell": domf.cell, "source": None})
 
-        # ограничения из промпта: если запрет на новое оборудование, а вмешательство
-        # его требует — не скрываем гипотезу, а честно помечаем и штрафуем приоритет
-        violates = []
-        priority = m.priority
-        if intent.no_new_equipment and diag.needs_equipment:
-            violates.append("без нового оборудования")
-            priority *= 0.1
+        # ограничения из промпта: гипотеза, конфликтующая с запретом (оборудование/
+        # реагенты), не скрывается — честно помечается и штрафуется по приоритету
+        violates = constraint_violations(intent, diag.family, diag.needs_equipment)
+        priority = m.priority * (0.1 if violates else 1.0)
 
         exp_test = (f"Применить «{primary}» на классе {cl.size_class} в промышленном "
                     f"масштабе при контролируемых условиях, сравнить с базовым режимом.")
@@ -187,9 +184,8 @@ class HypothesisGenerator:
         priority2 = impact2 * (0.5 + 0.5 * m.addressability) * (0.7 + 0.3 * clarity2) \
             * feas2 * m.confidence
 
-        violates = []
-        if intent.no_new_equipment and diag2.needs_equipment:
-            violates.append("без нового оборудования")
+        violates = constraint_violations(intent, diag2.family, diag2.needs_equipment)
+        if violates:
             priority2 *= 0.1
 
         evidence = [{"label": f"потери {el} в классе {cl.size_class}",

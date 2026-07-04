@@ -203,9 +203,12 @@ def _search_ddg(query: str, n: int, timeout=WEB_FETCH_TIMEOUT) -> list:
 class WebPractices:
     """Детерминированно обогащает гипотезы world_practice. Кэш по отпечатку. БЕЗ LLM."""
 
-    def __init__(self, cache_path=WEB_CACHE, log=lambda *a: None, **_ignore):
+    def __init__(self, cache_path=WEB_CACHE, log=lambda *a: None, search_fn=None, **_ignore):
         self.cache_path = cache_path
         self.log = log
+        # бэкенд поиска инъектируется (DDG по умолчанию; можно подставить Yandex Search
+        # API) — сигнатура search_fn(query, n) -> list[url]
+        self._search = search_fn or _search_ddg
         self._cache = self._load()
 
     @property
@@ -282,7 +285,7 @@ class WebPractices:
         best = None                                     # (score, WorldPractice)
         seen = set()
         for q in self._queries(intervention, family, element, extra):
-            for url in _search_ddg(q, WEB_MAX_RESULTS):
+            for url in self._search(q, WEB_MAX_RESULTS):
                 if url in seen:
                     continue
                 seen.add(url)
