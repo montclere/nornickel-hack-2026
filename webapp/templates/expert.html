@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Оценки эксперта{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/">← на главную</a></div>
+<h1>Оценки эксперта</h1>
+<p class="sub">Общая база вердиктов. Каждый вердикт <b>действует на все будущие
+запуски</b> (веб и командная строка), пока вы его не измените или не удалите здесь:
+«неверно» опускает гипотезу почти в конец списка (приоритет ×0.05), «уже пробовали» —
+заметно вниз и помечает её не-новой (×0.3), «полезно» — приподнимает (×1.2).
+Гипотезы никогда не скрываются.</p>
+
+{% if not entries %}
+<p class="muted">Пока пусто. Вердикты ставятся на карточке гипотезы (блок «Оценка
+эксперта») или импортом CSV: <code>python -m factory.feedback import файл.csv</code>.</p>
+{% else %}
+<div class="block" style="overflow-x:auto">
+<table class="xtab">
+  <thead><tr><th>фабрика</th><th>класс</th><th>вмешательство</th>
+    <th>вердикт</th><th>комментарий</th><th>когда</th><th></th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+  <tr data-i="{{ loop.index0 }}">
+    <td>{{ e.fabric }}</td>
+    <td>{{ e.size_class }}</td>
+    <td class="xint" title="{{ e.family }}">{{ e.intervention }}</td>
+    <td>
+      <select class="xverdict">
+        {% for v in ('полезно', 'неверно', 'уже_пробовали') %}
+        <option value="{{ v }}" {% if e.verdict == v %}selected{% endif %}>{{ v.replace('_', ' ') }}</option>
+        {% endfor %}
+      </select>
+    </td>
+    <td><input class="xnote" type="text" maxlength="300" value="{{ e.note }}"></td>
+    <td class="muted small">{{ e.imported_at }}</td>
+    <td class="xacts">
+      <button type="button" class="xsave" title="сохранить изменения">сохранить</button>
+      <button type="button" class="xdel" title="удалить вердикт — гипотеза вернётся на место в ранжировании">удалить</button>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="small" id="xstatus"></div>
+<p class="muted small">Файл базы: <code>{{ feedback_path }}</code> — обычный JSON,
+при необходимости правится и руками.</p>
+{% endif %}
+
+<script>
+(function () {
+  const entries = {{ entries | tojson }};
+  const st = document.getElementById("xstatus");
+  const KEY = ["fabric", "size_class", "family", "intervention", "target_element"];
+
+  document.querySelectorAll("tr[data-i]").forEach(tr => {
+    const e = entries[+tr.dataset.i];
+    const fd = () => {
+      const f = new FormData();
+      KEY.forEach(k => f.append(k, e[k] || ""));
+      return f;
+    };
+    tr.querySelector(".xsave").addEventListener("click", async () => {
+      const f = fd();
+      f.append("verdict", tr.querySelector(".xverdict").value);
+      f.append("note", tr.querySelector(".xnote").value.trim());
+      st.textContent = "сохраняем…";
+      const r = await fetch("/api/feedback", { method: "POST", body: f });
+      st.textContent = r.ok ? "сохранено — учтётся при следующем запуске"
+                            : "не удалось сохранить";
+    });
+    tr.querySelector(".xdel").addEventListener("click", async () => {
+      st.textContent = "удаляем…";
+      const r = await fetch("/api/feedback/delete", { method: "POST", body: fd() });
+      if (r.ok) { tr.remove(); st.textContent = "удалено — влияние на ранжирование снято"; }
+      else st.textContent = "не удалось удалить";
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -26,11 +26,12 @@ def create_app() -> FastAPI:
     _STATIC.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
 
-    from webapp.api.routes import export, files, health, pages, runs
+    from webapp.api.routes import expert, export, files, health, pages, runs
     app.include_router(health.router)
     app.include_router(runs.router)
     app.include_router(files.router)
     app.include_router(export.router)
+    app.include_router(expert.router)
     app.include_router(pages.router)
     return app
 

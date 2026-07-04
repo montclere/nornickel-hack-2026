@@ -113,6 +113,17 @@ def upsert(entry: dict, path: str = FEEDBACK_PATH) -> dict:
     return e
 
 
+def remove(entry: dict, path: str = FEEDBACK_PATH) -> bool:
+    """Удалить запись по ключу (страница «Эксперт» в вебе). True — если была."""
+    entries = load_feedback(path)
+    k = _key(entry)
+    kept = [e for e in entries if _key(e) != k]
+    if len(kept) == len(entries):
+        return False
+    save_feedback(kept, path)
+    return True
+
+
 def find_saved(hyp: dict, path: str = FEEDBACK_PATH) -> dict | None:
     """Сохранённый вердикт для гипотезы-СЛОВАРЯ (карточка веба) — точное совпадение."""
     k = _key(hyp)

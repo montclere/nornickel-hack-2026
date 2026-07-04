@@ -112,9 +112,10 @@
 
 <div class="block fbblock">
   <h3>Оценка эксперта</h3>
-  <p class="muted small" style="margin:0 0 10px">Вердикт сохраняется в общую базу и
-    учитывается при следующем запуске: «неверно» и «уже пробовали» опускают гипотезу
-    в ранжировании, не скрывая её.</p>
+  <p class="small fbnote-p">Вердикт <b>сохраняется навсегда</b> в общую базу и действует
+    на все будущие запуски (веб и командная строка), пока вы его не измените или не
+    удалите — <a href="/expert">все оценки</a>. «Неверно» и «уже пробовали» опускают
+    гипотезу в ранжировании, не скрывая её; «полезно» — приподнимает.</p>
   <div class="fbbtns" id="fbbtns">
     {% for v, label in [('полезно','Полезно'), ('неверно','Неверно'),
                         ('уже пробовали','Уже пробовали')] %}
@@ -129,6 +130,8 @@
   <div class="small" id="fbstatus">
     {% if saved_fb %}сохранено: {{ saved_fb.verdict.replace('_',' ') }} ({{ saved_fb.imported_at }}){% endif %}
   </div>
+  <button type="button" id="fbclear" class="fbclear"
+          {% if not saved_fb %}hidden{% endif %}>убрать вердикт</button>
 </div>
 
 <script>
@@ -147,9 +150,26 @@
       const r = await fetch(`/api/runs/{{ run_id }}/feedback`, { method: "POST", body: fd });
       if (!r.ok) { const t = await r.json().catch(() => ({})); throw new Error(t.detail || r.status); }
       btns.forEach(x => x.classList.toggle("on", x === b));
-      st.textContent = "сохранено: " + b.dataset.v + " — учтётся при следующем запуске";
+      document.getElementById("fbclear").hidden = false;
+      st.textContent = "сохранено: " + b.dataset.v + " — действует на все будущие запуски";
     } catch (e) { st.textContent = "не удалось сохранить: " + e.message; }
   }));
+  const clearBtn = document.getElementById("fbclear");
+  clearBtn.addEventListener("click", async () => {
+    const fd = new FormData();
+    fd.append("fabric", {{ meta.fabric | tojson }});
+    fd.append("size_class", {{ h.size_class | tojson }});
+    fd.append("family", {{ h.family | tojson }});
+    fd.append("intervention", {{ h.intervention | tojson }});
+    fd.append("target_element", {{ h.target_element | tojson }});
+    st.textContent = "убираем…";
+    const r = await fetch("/api/feedback/delete", { method: "POST", body: fd });
+    if (r.ok) {
+      btns.forEach(x => x.classList.remove("on"));
+      note.value = ""; clearBtn.hidden = true;
+      st.textContent = "вердикт удалён — влияние на ранжирование снято";
+    } else st.textContent = "не удалось удалить";
+  });
 })();
 </script>
 {% endblock %}

@@ -457,3 +457,27 @@ a.qmark{text-decoration:none} a.qmark:hover{text-decoration:none}
 .cons-hard{color:var(--warn-ink);background:var(--warn-bg);border:1px solid var(--warn-line);cursor:help}
 .cons-soft{color:var(--muted);background:var(--surface);border:1px solid var(--line);cursor:help}
 .cons-miss{color:var(--faint);background:var(--surface);border:1px dashed var(--line);cursor:help;font-style:italic}
+
+/* блок «Оценка эксперта» на карточке — заметный, фиолетовый акцент фидбэка */
+.fbblock{border:1.5px solid var(--violet-line);background:
+  linear-gradient(180deg,var(--violet-bg),var(--surface))}
+.fbblock h3{color:var(--violet-ink);font-size:12px}
+.fbnote-p{color:var(--muted);margin:0 0 10px}
+.fbnote-p b{color:var(--violet-ink)}
+.fbclear{margin-top:8px;font-size:12px;color:var(--muted);background:none;border:0;
+  cursor:pointer;text-decoration:underline}
+.fbclear:hover{color:#d9744a}
+/* таблица базы вердиктов (/expert) */
+.xtab{width:100%;border-collapse:collapse;font-size:13px}
+.xtab th{text-align:left;color:var(--faint);font-weight:600;font-size:11px;
+  text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--line)}
+.xtab td{padding:7px 8px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+.xtab .xint{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xtab select,.xtab input{padding:6px 9px;border:1px solid var(--line);border-radius:8px;
+  font-size:12.5px;background:var(--surface);color:var(--ink)}
+.xtab .xnote{width:180px}
+.xacts{white-space:nowrap}
+.xacts button{font-size:11.5px;padding:5px 10px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--muted);margin-left:4px}
+.xacts .xsave:hover{border-color:var(--accent);color:var(--accent-ink)}
+.xacts .xdel:hover{border-color:#d9744a;color:#d9744a}
