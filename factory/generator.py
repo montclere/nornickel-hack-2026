@@ -114,7 +114,8 @@ class HypothesisGenerator:
 
         # ограничения из промпта: гипотеза, конфликтующая с запретом (оборудование/
         # реагенты), не скрывается — честно помечается и штрафуется по приоритету
-        violates = constraint_violations(intent, diag.family, diag.needs_equipment)
+        violates = constraint_violations(intent, diag.family, diag.needs_equipment,
+                                          text=" ".join([primary] + diag.interventions[1:]))
         priority = m.priority * (0.1 if violates else 1.0)
 
         exp_test = (f"Применить «{primary}» на классе {cl.size_class} в промышленном "
@@ -184,7 +185,8 @@ class HypothesisGenerator:
         priority2 = impact2 * (0.5 + 0.5 * m.addressability) * (0.7 + 0.3 * clarity2) \
             * feas2 * m.confidence
 
-        violates = constraint_violations(intent, diag2.family, diag2.needs_equipment)
+        violates = constraint_violations(intent, diag2.family, diag2.needs_equipment,
+                                          text=" ".join([primary] + diag2.interventions[1:]))
         if violates:
             priority2 *= 0.1
 

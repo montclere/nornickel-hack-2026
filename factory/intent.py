@@ -71,6 +71,24 @@ _CONSTRAINTS = [
 # семейство, конфликтующее с ограничением «без новых реагентов» (из rules.py)
 REAGENT_FAMILY = "реагентный режим / кинетика флотации"
 
+# «без реагента <имя>» — запрет КОНКРЕТНОГО реагента, имя достаём регуляркой:
+# «без реагента Finfix 300», «без применения ксантогената», «не использовать КМЦ».
+# Имя сохраняется в ограничении и сверяется с ТЕКСТОМ вмешательства гипотезы.
+_NAMED_REAGENT_PATTERNS = [
+    r"без\s+(?:применения\s+|использования\s+)?реагента\s+([a-zа-яё][a-zа-яё0-9\- ]{1,30}?)(?=[,.;)]|$| без| и |\s{2})",
+    r"не\s+использовать\s+реагент[а-я]*\s+([a-zа-яё][a-zа-яё0-9\- ]{1,30}?)(?=[,.;)]|$| без| и )",
+]
+
+
+def _detect_named_reagents(low: str) -> list:
+    names = []
+    for pat in _NAMED_REAGENT_PATTERNS:
+        for m in re.finditer(pat, low):
+            name = m.group(1).strip()
+            if name and name not in names:
+                names.append(name)
+    return names
+
 
 @dataclass
 class Intent:
@@ -145,6 +163,9 @@ def parse_intent(kpi: str, schema_symbols=ELEMENT_SYMBOLS) -> Intent:
                              and not any(re.search(w, low) for w in _INCREASE_WORDS)) else "improve"
     cons = [{"tag": tag, "kind": kind} for tag, pats, kind in _CONSTRAINTS
             if any(p in low for p in pats)]
+    # запрет конкретного реагента: имя сверяется с текстом вмешательства гипотезы
+    for name in _detect_named_reagents(low):
+        cons.append({"tag": f"без реагента {name}", "kind": "reagent", "name": name})
 
     return Intent(kpi_text=kpi, target_element=element, element_detected=detected,
                   element_in_schema=elem_in_schema, requested_element=requested,
@@ -154,13 +175,21 @@ def parse_intent(kpi: str, schema_symbols=ELEMENT_SYMBOLS) -> Intent:
                   mentioned_elements=mentioned)
 
 
-def constraint_violations(intent: "Intent", family: str, needs_equipment: bool) -> list:
-    """Какие ограничения нарушает гипотеза (по семейству и потребности в оборудовании).
+def constraint_violations(intent: "Intent", family: str, needs_equipment: bool,
+                          text: str = "") -> list:
+    """Какие ограничения нарушает гипотеза (по семейству, потребности в оборудовании
+    и ТЕКСТУ вмешательства — для запрета конкретного реагента).
     Только «жёсткие» (equipment/reagent); quality/throughput — цели, не штрафуются."""
     v = []
+    low = (text or "").casefold()
     for c in getattr(intent, "constraints", None) or []:
         if c["kind"] == "equipment" and needs_equipment:
             v.append(c["tag"])
-        elif c["kind"] == "reagent" and family == REAGENT_FAMILY:
-            v.append(c["tag"])
+        elif c["kind"] == "reagent":
+            name = c.get("name")
+            if name:                              # запрет КОНКРЕТНОГО реагента —
+                if name in low:                   # нарушение, только если он в тексте
+                    v.append(c["tag"])
+            elif family == REAGENT_FAMILY:        # общий запрет новых реагентов
+                v.append(c["tag"])
     return v
