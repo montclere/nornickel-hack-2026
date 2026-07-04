@@ -67,7 +67,7 @@ def _graph_svg(layered, max_label=22):
         hub = nd["deg"] >= max_deg * 0.6 and nd["deg"] >= 3   # узлы-концентраторы — темнее
         fill, stroke = ("#dcebfb", "#8fc1f0") if hub else ("#eaf3fd", "#bcdcfa")
         nodes_svg += (
-            f'<g><title>{_esc(label)} · связей: {nd["deg"]}</title>'
+            f'<g class="gnode"><title>{_esc(label)} · связей: {nd["deg"]}</title>'
             f'<rect x="{x - w/2:.0f}" y="{y - 12:.0f}" width="{w:.0f}" height="24" rx="12" '
             f'fill="{fill}" stroke="{stroke}"/>'
             f'<text x="{x:.0f}" y="{y + 3.5:.0f}" text-anchor="middle" font-size="10" '
@@ -181,6 +181,7 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .tag.dir{{color:#1f7ae0;background:#eaf3fd}}
 .tag.st{{color:#a83f66;background:#fdeef4}}
 .tag.llm{{color:#5b3fa8;background:#f1ecfc;cursor:help}}
+.gnode{{cursor:pointer}} .gnode:hover rect{{stroke:#1f7ae0;stroke-width:2;filter:drop-shadow(0 2px 4px rgba(31,122,224,.35))}}
 .tri .row{{display:flex;gap:12px;align-items:baseline;margin:6px 0}}
 .lab{{flex:0 0 92px;text-align:right;font-size:10.5px;font-weight:700;letter-spacing:.5px;
   text-transform:uppercase;color:var(--teal)}} .lab.because{{color:#9db3bf}}

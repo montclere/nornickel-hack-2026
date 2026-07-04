@@ -481,3 +481,14 @@ a.qmark{text-decoration:none} a.qmark:hover{text-decoration:none}
   border:1px solid var(--line);background:var(--surface);color:var(--muted);margin-left:4px}
 .xacts .xsave:hover{border-color:var(--accent);color:var(--accent-ink)}
 .xacts .xdel:hover{border-color:#d9744a;color:#d9744a}
+
+/* переключатель треков А/Б */
+.tabs{display:flex;gap:6px;margin:22px 0 14px;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:13px;padding:5px;width:fit-content}
+.tab{font-size:13.5px;font-weight:650;padding:9px 18px;border-radius:9px;cursor:pointer;
+  border:0;background:none;color:var(--muted);display:flex;align-items:center;gap:7px;
+  transition:background .15s,color .15s}
+.tab b{font-weight:800}
+.tab.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-sm)}
+.tab:not(.on):not(:disabled):hover{color:var(--ink)}
+.tab:disabled{opacity:.45;cursor:not-allowed}

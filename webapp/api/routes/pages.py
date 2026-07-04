@@ -49,6 +49,18 @@ def run_page(request: Request, run_id: str, rs=Depends(get_report_service)):
         "context": rs.context(run_id) or {}, "metrics": rs.metrics(run_id) or {}})
 
 
+@router.get("/runs/{run_id}/lit/{rank}", response_class=HTMLResponse)
+def lit_card_page(request: Request, run_id: str, rank: int,
+                  rs=Depends(get_report_service)):
+    """Деталь гипотезы ветки Б (LLM-анализ литературы) — оформление как у трека А."""
+    got = rs.lit_hypothesis(run_id, rank)
+    if not got:
+        raise HTTPException(404, "гипотеза не найдена")
+    result, hyp = got
+    return TEMPLATES.TemplateResponse(request, "lit_card.html", {
+        "run_id": run_id, "h": hyp, "result": result})
+
+
 @router.get("/runs/{run_id}/hyp/{fi}/{rank}", response_class=HTMLResponse)
 def card_page(request: Request, run_id: str, fi: int, rank: int,
               rs=Depends(get_report_service)):

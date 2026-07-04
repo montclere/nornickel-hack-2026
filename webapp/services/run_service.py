@@ -115,11 +115,12 @@ class RunService:
                 fabrics.append((p, hyps, out.name))
 
         # --- ветка Б (литература) — только если есть неструктурные материалы и доступен LLM ---
-        lit_report = None
+        lit_report, lit_data = None, None
         llm_ok = bool(self.llm and self.llm.ready and self.llm.probe())
         if others and llm_ok:
             progress("Чтение литературы")
-            lit_report = self._branch_b(rd, kpi, intent, others, fabrics, log)
+            lit_report, lit_data = self._branch_b(rd, kpi, intent, others, fabrics,
+                                                  web, dos, log)
         elif others and not llm_ok:
             log("LLM недоступен — ветка Б пропущена (хвосты/досье/веб готовы)")
 
@@ -147,6 +148,7 @@ class RunService:
                                               analyze(p, element=intent.target_element))
             result["fabrics"].append(data)
         result["literature_report"] = lit_report
+        result["literature"] = lit_data          # карточки ветки Б для веба (может быть None)
         # какие элементы реально построены (мульти-элемент, когда металл в KPI не указан)
         result["elements_built"] = sorted({h.target_element for _, hyps, _ in fabrics for h in hyps})
         result["reports"] = reports + ([lit_report] if lit_report else [])
@@ -177,7 +179,7 @@ class RunService:
                 "literature": bool(lit_report), "warnings": warns,
                 "metrics": TELEMETRY.snapshot()["total"]}
 
-    def _branch_b(self, rd, kpi, intent, others, fabrics, log):
+    def _branch_b(self, rd, kpi, intent, others, fabrics, web, dos, log):
         """Извлечение из текста → граф → разрывы Свонсона → HTML ветки Б (report_kb).
         Плюс подкрепление карточек ветки А цитатами корпуса (litsupport)."""
         from factory.discover import discover
@@ -218,7 +220,60 @@ class RunService:
         html = render_kb(kg.to_layered(max_nodes=24), found, kpi=kpi, tech=tech)
         name = "литература_гипотезы.html"
         (rd / name).write_text(html, encoding="utf-8")
-        return name
+
+        # --- карточки ветки Б для веба: тот же вид, что у трека А ---
+        # веб-обогащение Б ГЛУБЖЕ, чем у А: практики и статьи ищутся для ВСЕХ
+        # гипотез (их ≤8), а не только топ-N — у LLM-трека обоснование критично
+        import types
+        wrappers = [types.SimpleNamespace(
+            intervention=d.a, family=("разрыв Свонсона" if d.b else "прямая связь"),
+            target_element=intent.target_element, world_practice=None, dossier=None)
+            for d in found]
+        if web and wrappers:
+            log("веб-практики — литература (все гипотезы)")
+            web.enrich(wrappers, extra=query, limit=len(wrappers))
+        if dos and wrappers:
+            log("научные статьи — литература (все гипотезы)")
+            dos.enrich(wrappers, limit=len(wrappers))
+
+        # карта basename → относительный путь в sources (кликабельные источники цитат)
+        src_root = rd / "sources"
+        relmap = {p.name: str(p.relative_to(src_root))
+                  for p in src_root.rglob("*") if p.is_file()}
+
+        def _quotes(d):
+            out, seen = [], set()
+            for e in getattr(d, "chain", None) or []:
+                q = (e.get("quote") or "").strip()
+                if not q or q in seen:
+                    continue
+                seen.add(q)
+                meta = e.get("meta") or {}
+                src = e.get("source") or meta.get("file") or ""
+                out.append({"quote": q, "locator": e.get("locator") or src,
+                            "source": src, "page": meta.get("page"),
+                            "path": relmap.get(src)})
+            return out
+
+        lit_hyps = []
+        for i, d in enumerate(found, 1):
+            w = wrappers[i - 1]
+            lit_hyps.append({
+                "rank": i, "kind": "gap" if d.b else "direct",
+                "is_action": bool(d.is_action), "role": d.role, "sign": d.sign,
+                "lever": d.a, "target": d.c, "bridge": d.b,
+                "statement_if": d.statement_if, "statement_then": d.statement_then,
+                "statement_because": d.statement_because,
+                "metrics": {"novelty": d.novelty, "relevance": d.relevance,
+                            "score": d.score},
+                "quotes": _quotes(d),
+                "world_practice": w.world_practice,
+                "dossier": w.dossier,
+            })
+        from factory.report_kb import _graph_svg
+        lit_data = {"hypotheses": lit_hyps, "tech": tech,
+                    "graph_svg": _graph_svg(kg.to_layered(max_nodes=24))}
+        return name, lit_data
 
     def _ocr(self):
         """OCR-клиент, если включён и реально доступен (preflight), иначе None."""

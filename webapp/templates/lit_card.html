@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}#{{ h.rank }} {{ h.lever }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="/runs/{{ run_id }}">← к списку гипотез</a></div>
+
+<div class="dhead">
+  <div class="hrank big">{{ h.rank }}</div>
+  <div>
+    <h1>{{ h.lever }}</h1>
+    <div class="dmeta">целевой параметр: {{ h.target }}
+      {% if h.bridge %} · через «{{ h.bridge }}»{% endif %}
+      · {{ 'разрыв Свонсона' if h.kind == 'gap' else 'прямая связь из источника' }}
+      <em class="llm-mark" title="связь извлечена языковой моделью из загруженной литературы; принята только потому, что дословная цитата найдена в источнике">LLM-извлечение · цитата проверена</em>
+    </div>
+  </div>
+  <div class="himpact big" data-tip="итоговый детерминированный ранг: новизна × релевантность цели × бонус промышленным действиям">{{ h.metrics.score }}<span>score</span></div>
+</div>
+
+{% if not h.is_action %}<div class="warn">Это абстрактный факт из литературы, а не готовое
+промышленное действие — сформулировано как направление «исследовать применимость»,
+не как рекомендация к внедрению.</div>{% endif %}
+
+<div class="tri">
+  <div class="row"><span>если</span><p>{{ h.statement_if }}</p></div>
+  <div class="row"><span>то</span><p>{{ h.statement_then }}</p></div>
+  <div class="row"><span class="bc">потому что</span><p class="muted">{{ h.statement_because }}</p></div>
+</div>
+
+<div class="metrics-row">
+  <span data-tip="редкость понятий в корпусе: редкое сочетание = новое направление"><b>{{ h.metrics.novelty }}</b> новизна</span>
+  <span data-tip="пересечение с целью запуска"><b>{{ h.metrics.relevance }}</b> релевантность</span>
+  <span data-tip="итоговый детерминированный ранг"><b>{{ h.metrics.score }}</b> score</span>
+  <span data-tip="знак влияния рычага на целевой параметр по источнику"><b>{{ 'повышает' if h.sign > 0 else ('снижает' if h.sign < 0 else 'связан') }}</b> влияние</span>
+</div>
+
+<div class="block">
+  <h3>Источники — дословные цитаты <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Каждая связь принята ТОЛЬКО потому, что эта фраза дословно найдена в файле. Клик открывает исходник (PDF — на нужной странице).">?</a></h3>
+  {% for q in h.quotes %}
+  <blockquote class="q">«{{ q.quote }}»
+    <span class="loc">
+      {% if q.path %}<a href="/runs/{{ run_id }}/sources/{{ q.path }}{% if q.page %}#page={{ q.page }}{% endif %}"
+        target="_blank" rel="noopener">{{ q.locator }}</a>
+      {% else %}{{ q.locator }}{% endif %}
+    </span>
+  </blockquote>
+  {% else %}<p class="muted">структурный вывод графа — прямой цитаты у ребра нет</p>{% endfor %}
+</div>
+
+{% if h.world_practice and h.world_practice.url %}
+<div class="block">
+  <h3>Мировая практика</h3>
+  <blockquote class="q">«{{ h.world_practice.quote }}»</blockquote>
+  <div class="small">источник:
+    <a href="{{ h.world_practice.url }}" target="_blank" rel="noopener">{{ h.world_practice.site }}</a></div>
+</div>
+{% endif %}
+
+{% if h.dossier %}
+<div class="block">
+  <h3>Научные статьи</h3>
+  {% for d in h.dossier %}
+  <div class="dosrc">
+    <div><span class="cit">{{ d.cited_by }} цит.</span>
+      <a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.title }}</a>
+      <span class="muted">{{ d.year }}</span></div>
+    {% if d.quote %}<div class="q">«{{ d.quote }}»</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="muted small">Связи извлечены языковой моделью и приняты только с дословной
+цитатой из источника; граф, разрывы и ранжирование считаются детерминированно поверх
+извлечённого — тот же корпус даёт тот же результат.</div>
+{% endblock %}

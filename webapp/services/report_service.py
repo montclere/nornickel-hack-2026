@@ -28,3 +28,10 @@ class ReportService:
             return None
         h = next((x for x in fab.get("hypotheses", []) if x.get("rank") == rank), None)
         return (fab, h) if h else None
+
+    def lit_hypothesis(self, run_id: str, rank: int):
+        """Гипотеза ветки Б (литература) по рангу — для страницы детали."""
+        res = self.result(run_id) or {}
+        lit = res.get("literature") or {}
+        h = next((x for x in lit.get("hypotheses", []) if x.get("rank") == rank), None)
+        return (res, h) if h else None

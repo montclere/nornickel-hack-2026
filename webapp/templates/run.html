@@ -67,7 +67,20 @@
   </details>
 </section>
 
-<!-- ═══ ГИПОТЕЗЫ ═══ -->
+<!-- ═══ ПЕРЕКЛЮЧАТЕЛЬ ТРЕКОВ ═══ -->
+{% set lit = result.get('literature') %}
+{% set nb = (lit.hypotheses | length) if lit else 0 %}
+<div class="tabs" id="track-tabs">
+  <button type="button" class="tab on" data-tab="a"
+          title="диагностика отчётов по хвостам: правила и метрики, воспроизводимо, без LLM">
+    Трек А · детерминированные <b>{{ nh }}</b></button>
+  <button type="button" class="tab" data-tab="b" {% if not nb %}disabled{% endif %}
+          title="{% if nb %}гипотезы извлечены языковой моделью из загруженной литературы; каждая связь подтверждена дословной цитатой с указанием файла и страницы{% else %}нет гипотез из литературы: не загружена литература, выключен LLM или он недоступен{% endif %}">
+    Трек Б · LLM-анализ <b>{{ nb }}</b> <em class="llm-mark">LLM</em></button>
+</div>
+
+<!-- ═══ ТРЕК А: ГИПОТЕЗЫ ═══ -->
+<section id="tab-a">
 {% for fabric in result.fabrics %}
   {% set fi = loop.index0 %}
   {% set m = fabric.meta %}
@@ -124,8 +137,79 @@
 
 {% if not result.fabrics %}
   <p class="muted">Гипотез по хвостам нет (нет отчётов <code>.xlsx</code> или элемента нет в схеме).
-  {% if result.get('literature_report') %}Ниже — отчёт из литературы.{% endif %}</p>
+  {% if nb %}Переключитесь на «Трек Б · LLM-анализ» — гипотезы из литературы.{% endif %}</p>
 {% endif %}
+</section>
+
+<!-- ═══ ТРЕК Б: LLM-АНАЛИЗ ЛИТЕРАТУРЫ ═══ -->
+{% if lit %}
+<section id="tab-b" hidden>
+  <section class="fabric-block">
+    <div class="fb-head">
+      <h2>Гипотезы из литературы <em class="llm-mark" title="связи извлечены языковой моделью; каждая принята только с дословной цитатой из источника (файл + страница)">LLM</em></h2>
+      <div class="fmeta">
+        <span><b>{{ lit.tech['фрагментов'] }}</b> фрагментов</span>
+        <span><b>{{ lit.tech['связей в кэше'] }}</b> связей</span>
+        <span><b>{{ lit.tech['узлов графа'] }}</b> узлов графа</span>
+        <span><b>{{ nb }}</b> гипотез</span>
+      </div>
+    </div>
+
+    <h3 class="rank-title">Граф знаний из литературы <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Сущности и связи, извлечённые из текста. Цвет ребра — знак влияния (бирюза: повышает, оранж: снижает). Наведите на узел — полное имя.">?</a></h3>
+    <div class="panels"><div class="panel">{{ lit.graph_svg | safe }}
+      <div class="legend"><span><i style="background:#12b3ab"></i>повышает</span>
+        <span><i style="background:#e0762f"></i>снижает</span>
+        <span><i style="background:#b9c8d2"></i>связан / не влияет</span></div>
+    </div></div>
+
+    <h3 class="rank-title">Ранжирование гипотез <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Порядок детерминированный: релевантность цели → новизна → бонус промышленным действиям. LLM только извлекает связи, в ранжировании не участвует.">?</a></h3>
+    <div class="rank-list">
+      {% for h in lit.hypotheses %}
+      <a class="rcard" href="/runs/{{ run_id }}/lit/{{ h.rank }}">
+        <div class="rc-rank">{{ h.rank }}</div>
+        <div class="rc-main">
+          <div class="rc-head">{{ h.statement_if }}</div>
+          <div class="rc-tags">
+            <span class="rc-fam">{{ 'разрыв Свонсона' if h.kind == 'gap' else 'прямая связь из источника' }}</span>
+            <span class="{{ 'rc-2nd' if h.is_action else 'rc-viol' }}">{{ 'промышленное действие' if h.is_action else 'к исследованию' }}</span>
+            {% if h.world_practice %}<span class="rc-fam">практика подтверждена</span>{% endif %}
+            {% if h.dossier %}<span class="rc-fam">{{ h.dossier|length }} статей</span>{% endif %}
+          </div>
+          <div class="rc-bars">
+            {% set met = [
+              ('novelty', h.metrics.novelty, h.metrics.novelty, 'Новизна: насколько редки эти понятия в корпусе — редкое сочетание = новое направление.'),
+              ('relevance', h.metrics.relevance, h.metrics.relevance, 'Релевантность: пересечение с целью запуска.'),
+              ('score', h.metrics.score, [h.metrics.score, 1.0]|min, 'Итоговый ранг: новизна × релевантность × бонус промышленным действиям. Детерминированная формула.')] %}
+            {% for name, val, frac, tip in met %}
+            <div class="mbar" data-tip="{{ tip }}"><span>{{ name }}</span>
+              <div class="track"><i style="width:{{ (frac*100)|round|int }}%"></i></div><em>{{ val }}</em></div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="rc-right">
+          <div class="rc-impact" data-tip="итоговый детерминированный ранг">{{ h.metrics.score }}<span>score</span></div>
+          <div class="rc-prio">{{ h.quotes|length }} цитат-источников</div>
+          <div class="rc-open">подробнее</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+</section>
+{% endif %}
+
+<script>
+(function () {
+  const tabs = document.querySelectorAll("#track-tabs .tab");
+  tabs.forEach(t => t.addEventListener("click", () => {
+    if (t.disabled) return;
+    tabs.forEach(x => x.classList.toggle("on", x === t));
+    document.getElementById("tab-a").hidden = t.dataset.tab !== "a";
+    const b = document.getElementById("tab-b");
+    if (b) b.hidden = t.dataset.tab !== "b";
+  }));
+})();
+</script>
 
 <!-- ═══ ЭКСПОРТ + ТЕХ.ДЕТАЛИ ═══ -->
 <details class="dl-block">
