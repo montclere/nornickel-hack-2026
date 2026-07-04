@@ -47,6 +47,12 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "")).strip().lower()
 
 
+def _canon(s: str) -> str:
+    """Только буквы/цифры, без регистра и пунктуации — для сравнения цитаты с заголовком
+    устойчиво к кавычкам/пробелам/пунктуации (используется в гейте качества)."""
+    return re.sub(r"[^0-9a-zа-яё]+", "", (s or "").lower())
+
+
 def _domain(url: str) -> str:
     try:
         return urllib.parse.urlparse(url).netloc.lower().lstrip("www.")

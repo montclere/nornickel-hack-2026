@@ -74,5 +74,5 @@ def enrich(hyps, relations: list, log=lambda *a: None) -> int:
         if lit:
             h.literature = lit
             n += 1
-            log(f"  📚 {h.size_class}/{h.family}: +{len(lit)} цитат из корпуса")
+            log(f"  {h.size_class}/{h.family}: +{len(lit)} цитат из корпуса")
     return n

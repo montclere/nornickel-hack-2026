@@ -68,6 +68,14 @@ def serialize(hyps, profile=None, kpi: str = "") -> dict:
 
 def _record(h) -> dict:
     g = lambda name, default="": getattr(h, name, default)
+    # эксперимент теперь три поля (тест/метрика/критерий, см. generator.py); собираем в
+    # одну строку для плоских форматов и оставляем структурно для JSON. Fallback на
+    # старое поле experiment — на случай объектов до разбиения.
+    exp = " | ".join(p for p in (
+        f"Тест: {g('exp_test')}" if g("exp_test") else "",
+        f"Метрика: {g('exp_metric')}" if g("exp_metric") else "",
+        f"Критерий: {g('exp_criterion')}" if g("exp_criterion") else "",
+    ) if p) or g("experiment")
     return {
         "rank": g("rank", 0),
         "size_class": g("size_class"),
@@ -80,7 +88,9 @@ def _record(h) -> dict:
         "statement_if": g("statement_if"),
         "statement_then": g("statement_then"),
         "statement_because": g("statement_because"),
-        "experiment": g("experiment"),
+        "experiment": exp,
+        "exp_test": g("exp_test"), "exp_metric": g("exp_metric"),
+        "exp_criterion": g("exp_criterion"),
         "roadmap": list(g("roadmap", []) or []),         # лаборатория→пилот→внедрение
         "evidence": list(g("evidence", []) or []),
         "sources": list(g("sources", []) or []),

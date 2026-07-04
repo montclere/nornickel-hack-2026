@@ -120,7 +120,7 @@ def _card(h, runinfo=None):
         note = f' — «{_esc(fb["note"])}»' if fb.get("note") else ""
         novel = (" Совпадает с базой испробованных направлений → не ново."
                  if fb.get("not_novel") else "")
-        warn += (f'<div class="fb">⚑ фидбэк эксперта: '
+        warn += (f'<div class="fb">фидбэк эксперта: '
                  f'<b>{_esc(fb.get("verdict", "").replace("_", " "))}</b>{note} · '
                  f'приоритет ×{fb.get("multiplier", 1)} '
                  f'({"точное совпадение" if fb.get("tier") == "exact" else "по семейству"}).'
@@ -227,8 +227,11 @@ def _world_practice_html(wp, searched=None):
     if isinstance(wp, str):        # обратная совместимость
         return f'<p class="muted">{_esc(wp)}</p>'
     url, site = _esc(wp.get("url", "")), _esc(wp.get("site", "источник"))
-    return (f'<p>{_esc(wp.get("practice", ""))}</p>'
-            f'<blockquote class="wpq">«{_esc(wp.get("quote", ""))}»</blockquote>'
+    practice, quote = (wp.get("practice") or "").strip(), (wp.get("quote") or "").strip()
+    # в детерминированном режиме practice == quote (цитата и есть практика) — не дублируем;
+    # отдельное резюме показываем, только если оно РЕАЛЬНО другое (было у LLM-версии)
+    summary = f'<p>{_esc(practice)}</p>' if practice and practice != quote else ""
+    return (f'{summary}<blockquote class="wpq">«{_esc(quote)}»</blockquote>'
             f'<div class="wpsrc">источник: <a href="{url}" target="_blank" '
             f'rel="noopener">{site}</a></div>')
 

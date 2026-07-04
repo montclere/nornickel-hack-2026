@@ -186,7 +186,7 @@ def apply_feedback(hyps, fabric: str, entries: list | None = None,
             "not_novel": e["verdict"] == "уже_пробовали",
         }
         touched += 1
-        log(f"  ⚑ {h.size_class}/{h.family}: {e['verdict']} ({tier}) — "
+        log(f"  {h.size_class}/{h.family}: {e['verdict']} ({tier}) — "
             f"приоритет ×{mult} ({old} → {h.metrics['priority']})")
     if touched:
         hyps.sort(key=lambda h: -h.metrics.get("priority", 0.0))
