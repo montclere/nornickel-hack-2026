@@ -13,6 +13,9 @@
     <a class="rep" href="/runs/{{ run_id }}/report/{{ name }}" target="_blank" rel="noopener">{{ name }}</a>
   {% endfor %}
   <a class="rep" href="/runs/{{ run_id }}/report/glossary.html" target="_blank" rel="noopener">глоссарий</a>
+  {% if result.fabrics %}
+  <a class="rep" href="/runs/{{ run_id }}/export/summary" download>сводка (CSV)</a>
+  {% endif %}
 </div>
 
 {% for fabric in result.fabrics %}
@@ -24,6 +27,12 @@
       {% for sym, t in m.recoverable_tonnes_total.items() %}<span>{{ t }} т {{ sym }} извлек.</span>{% endfor %}
       <span>топ-3 покрывают ~{{ m.kpi_potential_top3_pct }}% потерь</span>
       <span>{{ fabric.hypotheses|length }} гипотез</span>
+    </div>
+    <div class="exports">скачать:
+      {% for fmt, label in [('pdf','PDF'), ('docx','DOCX'), ('csv','CSV'),
+                            ('json','JSON'), ('tasks','задачи Jira')] %}
+      <a href="/runs/{{ run_id }}/export/{{ fi }}/{{ fmt }}" download>{{ label }}</a>
+      {% endfor %}
     </div>
     <div class="grid">
       {% for h in fabric.hypotheses %}

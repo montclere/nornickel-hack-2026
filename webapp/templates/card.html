@@ -95,5 +95,48 @@
 </div>
 {% endif %}
 
+<div class="block fbblock">
+  <h3>Оценка эксперта</h3>
+  <p class="muted small" style="margin:0 0 10px">Вердикт сохраняется в общую базу и
+    учитывается при следующем запуске: «неверно» и «уже пробовали» опускают гипотезу
+    в ранжировании, не скрывая её.</p>
+  <div class="fbbtns" id="fbbtns">
+    {% for v, label in [('полезно','Полезно'), ('неверно','Неверно'),
+                        ('уже пробовали','Уже пробовали')] %}
+    <button type="button" data-v="{{ v }}"
+      class="fbbtn{% if saved_fb and saved_fb.verdict.replace('_',' ') == v %} on{% endif %}">
+      {{ label }}</button>
+    {% endfor %}
+  </div>
+  <input type="text" id="fbnote" class="fbnote" maxlength="300"
+         placeholder="комментарий (необязательно)"
+         value="{{ saved_fb.note if saved_fb else '' }}">
+  <div class="small" id="fbstatus">
+    {% if saved_fb %}сохранено: {{ saved_fb.verdict.replace('_',' ') }} ({{ saved_fb.imported_at }}){% endif %}
+  </div>
+</div>
+
 <div class="muted small">Все числа взяты из ячеек загруженного отчёта; как считается приоритет — в глоссарии.</div>
+
+<script>
+(function () {
+  const btns = document.querySelectorAll("#fbbtns .fbbtn");
+  const note = document.getElementById("fbnote");
+  const st = document.getElementById("fbstatus");
+  btns.forEach(b => b.addEventListener("click", async () => {
+    const fd = new FormData();
+    fd.append("fi", {{ fi | tojson }});
+    fd.append("rank", {{ h.rank | tojson }});
+    fd.append("verdict", b.dataset.v);
+    fd.append("note", note.value.trim());
+    st.textContent = "сохраняем…";
+    try {
+      const r = await fetch(`/api/runs/{{ run_id }}/feedback`, { method: "POST", body: fd });
+      if (!r.ok) { const t = await r.json().catch(() => ({})); throw new Error(t.detail || r.status); }
+      btns.forEach(x => x.classList.toggle("on", x === b));
+      st.textContent = "сохранено: " + b.dataset.v + " — учтётся при следующем запуске";
+    } catch (e) { st.textContent = "не удалось сохранить: " + e.message; }
+  }));
+})();
+</script>
 {% endblock %}

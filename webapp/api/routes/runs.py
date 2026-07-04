@@ -80,6 +80,35 @@ async def create_run(
     return {"run_id": run_id, "redirect": f"/runs/{run_id}/loading"}
 
 
+@router.post("/runs/{run_id}/feedback")
+def save_feedback(run_id: str, fi: int = Form(...), rank: int = Form(...),
+                  verdict: str = Form(...), note: str = Form("")):
+    """Вердикт эксперта с карточки → общая база feedback.json (factory.feedback).
+    Тот же механизм, что у импорта из CSV: следующий запуск (веб или CLI)
+    применит вердикт автоматически — переранжирует, не скрывая гипотезу."""
+    result = storage.load_json(run_id, "result.json")
+    if not result:
+        raise HTTPException(404, "результаты не найдены")
+    fabrics = result.get("fabrics") or []
+    if not (0 <= fi < len(fabrics)):
+        raise HTTPException(404, "фабрика не найдена")
+    hyp = next((h for h in fabrics[fi].get("hypotheses", []) if h.get("rank") == rank), None)
+    if hyp is None:
+        raise HTTPException(404, "гипотеза не найдена")
+
+    from factory.feedback import upsert
+    entry = {"fabric": fabrics[fi].get("meta", {}).get("fabric", ""),
+             "size_class": hyp.get("size_class", ""), "family": hyp.get("family", ""),
+             "intervention": hyp.get("intervention", ""),
+             "target_element": hyp.get("target_element", ""),
+             "verdict": verdict, "note": note}
+    try:
+        saved = upsert(entry)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return {"ok": True, "verdict": saved["verdict"], "note": saved.get("note", "")}
+
+
 @router.get("/runs/{run_id}/status")
 def run_status(run_id: str):
     st = storage.load_json(run_id, "status.json")

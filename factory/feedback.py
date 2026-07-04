@@ -91,6 +91,34 @@ def _key(e) -> tuple:
                  ("fabric", "size_class", "family", "intervention", "target_element"))
 
 
+def upsert(entry: dict, path: str = FEEDBACK_PATH) -> dict:
+    """Добавить/обновить ОДНУ запись фидбэка (вердикт с карточки в вебе — тот же
+    формат, что у импорта из CSV). Возвращает сохранённую запись."""
+    verdict = canon_verdict(entry.get("verdict"))
+    if verdict is None:
+        raise ValueError(f"непонятный вердикт «{entry.get('verdict')}» "
+                         f"(допустимо: полезно / неверно / уже пробовали)")
+    e = {k: str(entry.get(k, "")).strip() for k in
+         ("fabric", "size_class", "family", "intervention", "target_element", "note")}
+    e["verdict"] = verdict
+    e["imported_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    entries = load_feedback(path)
+    for old in entries:
+        if _key(old) == _key(e):
+            old.update(e)
+            break
+    else:
+        entries.append(e)
+    save_feedback(entries, path)
+    return e
+
+
+def find_saved(hyp: dict, path: str = FEEDBACK_PATH) -> dict | None:
+    """Сохранённый вердикт для гипотезы-СЛОВАРЯ (карточка веба) — точное совпадение."""
+    k = _key(hyp)
+    return next((e for e in load_feedback(path) if _key(e) == k), None)
+
+
 # ─────────────────────────── импорт из CSV эксперта ───────────────────────────
 
 def import_csv(csv_path: str, feedback_path: str = FEEDBACK_PATH,

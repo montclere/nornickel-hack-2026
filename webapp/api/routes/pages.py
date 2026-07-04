@@ -46,6 +46,10 @@ def card_page(request: Request, run_id: str, fi: int, rank: int,
     if not got:
         raise HTTPException(404, "гипотеза не найдена")
     fabric, hyp = got
+    # сохранённый ранее вердикт эксперта по ЭТОЙ гипотезе (общая база feedback.json) —
+    # чтобы карточка показывала актуальное состояние, а не только применённое в запуске
+    from factory.feedback import find_saved
+    saved_fb = find_saved({**hyp, "fabric": fabric.get("meta", {}).get("fabric", "")})
     return TEMPLATES.TemplateResponse(request, "card.html", {
-        "run_id": run_id, "fi": fi,
+        "run_id": run_id, "fi": fi, "saved_fb": saved_fb,
         "fabric": fabric, "h": hyp, "meta": fabric.get("meta", {})})
