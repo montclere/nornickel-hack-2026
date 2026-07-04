@@ -56,32 +56,14 @@ class HypothesisGenerator:
 
     def generate(self, profile, kpi: str = "", log=lambda *a: None) -> list:
         intent = parse_intent(kpi)
-        element = intent.target_element
-        diagnoses = {cl.size_class: diagnose(cl.dominant_recoverable_form(element),
-                                             cl.size_class)
-                     for cl in profile.classes}
-        metrics = self.scorer.score_all(profile, diagnoses, element=element)
-
+        # металл в KPI НЕ указан → строим по ВСЕМ элементам схемы (Ni И Cu), а не молча по
+        # одному дефолту; каждый гипотез несёт свой target_element, ранжируем всех вместе
+        elements = (list(ELEMENT_SYMBOLS)
+                    if (not intent.element_detected and intent.element_in_schema)
+                    else [intent.target_element])
         hyps = []
-        for cl in profile.classes:
-            diag = diagnoses.get(cl.size_class)
-            # НЕ молчим: если класс не даёт гипотезы — честно говорим почему (нет
-            # извлекаемой формы вовсе / нулевой извлекаемый тоннаж по целевому элементу)
-            if diag is None:
-                log(f"класс {cl.size_class}: пропущен — нет извлекаемой формы {element} "
-                    f"(дом. форма отсутствует/неизвлекаема)")
-                continue
-            if sum(metrics[cl.size_class].rec_tonnes.values()) <= 0:
-                log(f"класс {cl.size_class}: пропущен — нулевой извлекаемый тоннаж {element}")
-                continue
-            hyps.append(self._build(cl, diag, metrics[cl.size_class], element, intent))
-            # второе направление класса: заметная НЕдоминирующая форма → своя гипотеза.
-            # Пример: доминирует закрытый (диагноз «доизмельчение»), но 30% извлекаемого
-            # сидит в раскрытой форме — флотационное направление честно предлагается
-            # тоже, с тоннажом и приоритетом, промасштабированными на долю формы.
-            sec = self._secondary(cl, diag, metrics[cl.size_class], element, intent)
-            if sec is not None:
-                hyps.append(sec)
+        for element in elements:
+            hyps.extend(self._for_element(profile, element, intent, log))
 
         hyps.sort(key=lambda h: -h.metrics["priority"])
         for i, h in enumerate(hyps, 1):
@@ -90,6 +72,28 @@ class HypothesisGenerator:
                 e["source"] = profile.source
                 e["path"] = profile.path         # полный путь → кликабельная ссылка в отчёте
         return hyps
+
+    def _for_element(self, profile, element, intent, log=lambda *a: None) -> list:
+        """Гипотезы по ОДНОМУ целевому элементу (диагноз+метрики считаются под него)."""
+        diagnoses = {cl.size_class: diagnose(cl.dominant_recoverable_form(element),
+                                             cl.size_class)
+                     for cl in profile.classes}
+        metrics = self.scorer.score_all(profile, diagnoses, element=element)
+        out = []
+        for cl in profile.classes:
+            diag = diagnoses.get(cl.size_class)
+            if diag is None:
+                log(f"[{element}] класс {cl.size_class}: пропущен — нет извлекаемой формы")
+                continue
+            if sum(metrics[cl.size_class].rec_tonnes.values()) <= 0:
+                log(f"[{element}] класс {cl.size_class}: пропущен — нулевой извлекаемый тоннаж")
+                continue
+            out.append(self._build(cl, diag, metrics[cl.size_class], element, intent))
+            # второе направление класса: заметная НЕдоминирующая форма → своя гипотеза
+            sec = self._secondary(cl, diag, metrics[cl.size_class], element, intent)
+            if sec is not None:
+                out.append(sec)
+        return out
 
     def _build(self, cl, diag, m, element, intent: Intent) -> Hypothesis:
         rec = m.rec_tonnes

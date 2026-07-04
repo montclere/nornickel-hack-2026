@@ -128,7 +128,7 @@ def main():
     print(f"  элементы: {[(e.label, e.symbol) for e in schema.elements]}")
     print(f"  раскрытая форма: {schema.liberated_form} | закрытая: {schema.locked_form}")
 
-    print("\n⚠ Это ПРЕДЛОЖЕНИЕ, не факт: LLM классифицирует подписи файла, а не")
+    print("\nВнимание: Это ПРЕДЛОЖЕНИЕ, не факт: LLM классифицирует подписи файла, а не")
     print("  извлекает дословный факт (цитатный гейт тут неприменим). Проверьте файл")
     print(f"  схемы ({out}) перед боевым использованием.")
 
@@ -136,7 +136,7 @@ def main():
     from factory.reader import TailingsReader
     prof = TailingsReader(args.report, schema=schema).read()
     if prof.warnings:
-        print("  ⚠ схема ДАЛА ПРЕДУПРЕЖДЕНИЯ при пробном парсинге — вероятно, неточна:")
+        print("  Внимание: схема ДАЛА ПРЕДУПРЕЖДЕНИЯ при пробном парсинге — вероятно, неточна:")
         for w in prof.warnings:
             print(f"    · {w}")
     else:

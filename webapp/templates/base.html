@@ -5,16 +5,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block title %}Фабрика гипотез{% endblock %}</title>
   <link rel="stylesheet" href="/static/fonts.css">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/app.css?v={{ static_v }}">
 </head>
 <body>
   <header class="top">
     <a class="brand" href="/">Фабрика <span>гипотез</span></a>
+    <nav class="topnav">
+      <a href="/glossary">как читать</a>
+    </nav>
     <span id="health" class="health" title="доступность сервисов">проверка сервисов…</span>
   </header>
   <main class="wrap">
     {% block content %}{% endblock %}
   </main>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ static_v }}"></script>
 </body>
 </html>

@@ -42,8 +42,8 @@ class RunService:
         self.llm = llm            # LLMClient | None
         self.search = search      # SearchClient | None
 
-    def run(self, run_id: str, kpi: str, web_search: bool = False, use_llm: bool = True,
-            max_chunks: int = 14, progress=None, log=None) -> dict:
+    def run(self, run_id: str, kpi: str, constraints: str = "", web_search: bool = False,
+            use_llm: bool = True, max_chunks: int = 14, progress=None, log=None) -> dict:
         from factory.client import TELEMETRY
         from factory.export import serialize
         from factory.glossary import write as write_glossary
@@ -65,11 +65,13 @@ class RunService:
         others = [f for f in sorted(files)
                   if f not in tailings and "гипотез" not in os.path.basename(f).lower()]
 
-        # целевой элемент / предупреждение о нём (не выдаём чужой элемент за никель)
+        # KPI и ограничения — РАЗДЕЛЬНО (не сливаем в один промпт); для распознавания
+        # элемента и ограничений парсим их вместе, но в интерфейс KPI отдаём чистым
+        combined = (f"{kpi} {constraints}".strip()) if constraints else kpi
         from factory.intent import parse_intent, warn_intent
-        intent = parse_intent(kpi)
+        intent = parse_intent(combined)
         warns = []
-        skip_a = warn_intent(intent, kpi, emit=warns.append)
+        skip_a = warn_intent(intent, combined, emit=warns.append)
 
         web = dos = None
         if use_web:
@@ -87,7 +89,7 @@ class RunService:
             progress("Диагностика отчётов")
             diagnosed = []
             for t in tailings:
-                res = HypothesisFactory(t, kpi=kpi).run()
+                res = HypothesisFactory(t, kpi=combined).run()   # combined → элемент+ограничения в логику
                 diagnosed.append((res["profile"], res))
                 all_hyps.extend(res["hypotheses"])
                 log(f"диагностика — {res['profile'].fabric}")
@@ -125,15 +127,37 @@ class RunService:
         write_glossary(str(rd))
 
         # --- сериализация для рендера карточек + контекст + метрики ---
-        result = {"kpi": kpi, "target_element": intent.target_element,
+        from factory.analysis import analyze
+        from factory.knowledge import ProfileGraph
+        from factory.report import panels_html
+        result = {"kpi": kpi, "constraints_text": constraints,
+                  "target_element": intent.target_element,
                   "element_in_schema": intent.element_in_schema,
+                  "direction": intent.direction,
+                  "constraints": intent.matched_constraints,
                   "warnings": warns, "fabrics": []}
         for p, hyps, html_name in fabrics:
             data = serialize(hyps, profile=p, kpi=kpi)
             data["report_html"] = html_name
+            # встраиваемые визуальные панели (граф + кривая раскрытия + форм-таблица)
+            data["panels_html"] = panels_html(ProfileGraph(p).to_layered(),
+                                              analyze(p, element=intent.target_element))
             result["fabrics"].append(data)
         result["literature_report"] = lit_report
+        # какие элементы реально построены (мульти-элемент, когда металл в KPI не указан)
+        result["elements_built"] = sorted({h.target_element for _, hyps, _ in fabrics for h in hyps})
         result["reports"] = reports + ([lit_report] if lit_report else [])
+        # конфиг прогона + загруженные файлы (для инфо-блока и блока «скачать»)
+        result["config"] = {"web_search": web_search, "use_llm": use_llm,
+                            "max_chunks": max_chunks, "llm_available": llm_ok,
+                            "search": getattr(self.search, "name", "—")}
+        result["uploaded"] = {
+            "data": [os.path.relpath(t, src) for t in tailings]
+                    + [os.path.relpath(o, src) for o in others if "/data/" in o.replace(os.sep, "/")],
+            "knowledge": [os.path.relpath(o, src) for o in others
+                          if "/data/" not in o.replace(os.sep, "/")]}
+        result["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        result["metrics_total"] = TELEMETRY.snapshot()["total"]
         storage.save_json(run_id, "result.json", result)
 
         ctx = {"kpi": kpi, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),

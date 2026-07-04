@@ -55,7 +55,9 @@ def _graph_svg(layered):
         color = "#12b3ab" if e.get("recoverable") else (
             "#1f7ae0" if e["kind"] == "loses" else "#d3dee6")
         mx = (x1r + x2l) / 2
-        edges_svg += (f'<path d="M{x1r:.0f},{y1:.0f} C{mx:.0f},{y1:.0f} '
+        tip = f'{_esc(sd["label"])} — {_esc(dd["label"])}: {e["tonnes"]} т'
+        edges_svg += (f'<path class="gedge" data-a="{_esc(e["src"])}" data-b="{_esc(e["dst"])}" '
+                      f'data-tip="{tip}" d="M{x1r:.0f},{y1:.0f} C{mx:.0f},{y1:.0f} '
                       f'{mx:.0f},{y2:.0f} {x2l:.0f},{y2:.0f}" fill="none" '
                       f'stroke="{color}" stroke-width="{w:.1f}" opacity="0.55"/>')
 
@@ -75,9 +77,11 @@ def _graph_svg(layered):
         label = _esc(nd["label"])
         if len(label) > 24:
             label = label[:23] + "…"
+        ntip = f'{kind}: {_esc(nd["label"])}'
         nodes_svg += (
-            f'<g><rect x="{x-w/2:.0f}" y="{y-15:.0f}" width="{w}" height="30" rx="8" '
-            f'fill="{fill}" stroke="{stroke}"/>'
+            f'<g class="gnode" data-id="{_esc(nid)}" data-tip="{ntip}">'
+            f'<rect x="{x-w/2:.0f}" y="{y-15:.0f}" '
+            f'width="{w}" height="30" rx="8" fill="{fill}" stroke="{stroke}"/>'
             f'<text x="{x:.0f}" y="{y+4:.0f}" text-anchor="middle" font-size="11.5" '
             f'fill="{tcol}">{label}</text></g>')
 
@@ -242,10 +246,13 @@ def _liberation_svg(lib):
     xs = [pad + (W - 2 * pad) * i / max(n - 1, 1) for i in range(n)]
     def y(p):
         return H - pad - (H - 2 * pad) * p / 100
-    def poly(key, color):
+    def poly(key, color, name):
         pts = " ".join(f"{xs[i]:.0f},{y(r[key]):.0f}" for i, r in enumerate(lib))
-        dots = "".join(f'<circle cx="{xs[i]:.0f}" cy="{y(r[key]):.0f}" r="3.5" '
-                       f'fill="{color}"/>' for i, r in enumerate(lib))
+        dots = "".join(
+            f'<circle class="gdot" cx="{xs[i]:.0f}" cy="{y(r[key]):.0f}" r="4" fill="{color}" '
+            f'data-tip="{_esc(r["class"])} · {name}: {r[key]}%'
+            + (f' · {r["rec_tonnes"]} т извлекаемо' if key == "recoverable_pct" and r.get("rec_tonnes") is not None else '')
+            + '"/>' for i, r in enumerate(lib))
         return f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="2.5"/>{dots}'
     grid = "".join(f'<line x1="{pad}" y1="{y(v):.0f}" x2="{W-pad}" y2="{y(v):.0f}" '
                    f'stroke="#eef4f7"/><text x="{pad-6}" y="{y(v)+4:.0f}" text-anchor="end" '
@@ -253,17 +260,31 @@ def _liberation_svg(lib):
     labels = "".join(f'<text x="{xs[i]:.0f}" y="{H-10}" text-anchor="middle" font-size="10" '
                      f'fill="#5f7d8c">{_esc(r["class"])}</text>' for i, r in enumerate(lib))
     return (f'<svg viewBox="0 0 {W} {H}" width="100%">{grid}'
-            f'{poly("locked_pct","#1f7ae0")}{poly("recoverable_pct","#12b3ab")}{labels}</svg>')
+            f'{poly("locked_pct","#1f7ae0","закрытый")}'
+            f'{poly("recoverable_pct","#12b3ab","извлекаемо")}{labels}</svg>')
+
+
+def panels_html(layered, analysis):
+    """Готовые визуальные панели (граф знаний + кривая раскрытия + форм-таблица) — те же
+    SVG/таблицы, что в HTML-отчёте ядра, для ВСТРАИВАНИЯ в веб-страницу (webapp).
+    Разметка использует классы .panel/.legend/.forms/.h-sub/.anote (см. app.css)."""
+    graph = _graph_svg(layered) if layered else ""
+    legend = ('<div class="legend">'
+              '<span><i style="background:#1f7ae0"></i>элемент → класс (потери)</span>'
+              '<span><i style="background:#12b3ab"></i>класс → извлекаемая форма</span>'
+              '<span><i style="background:#d3dee6"></i>класс → неизвлекаемая форма</span></div>')
+    graph_panel = f'<div class="panel"><h2>Граф знаний</h2>{graph}{legend}</div>' if graph else ""
+    return graph_panel + _analysis_html(analysis)
 
 
 def _analysis_html(a):
     if not a:
         return ""
     grind = a.get("optimal_grind")
-    grind_html = (f'<div class="anote"><b>Обрыв раскрытия</b> до класса {_esc(grind)}: '
+    grind_html = (f'<div class="cnote"><b>Обрыв раскрытия</b> до класса {_esc(grind)}: '
                   f'закрытого Pnt больше раскрытого — измельчать мельче этой границы.</div>'
                   if grind else "")
-    tos = "".join(f'<div class="anote">{_esc(t)}</div>' for t in a.get("tradeoffs", []))
+    tos = "".join(f'<div class="cnote">{_esc(t)}</div>' for t in a.get("tradeoffs", []))
     forms = "".join(
         f'<tr class="{"rec" if r["recoverable"] else "norec"}"><td>{"✓" if r["recoverable"] else "✗"}</td>'
         f'<td>{_esc(r["form"])}</td><td>{r["tonnes"]} т</td><td>{r["share_pct"]}%</td>'

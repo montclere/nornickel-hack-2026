@@ -108,12 +108,12 @@ def warn_intent(intent: "Intent", kpi: str, emit=print, schema_symbols=ELEMENT_S
     """Единая точка предупреждений о целевом элементе (используют и pipeline, и flex).
     Возвращает True, если ветку А по хвостам считать НЕ имеет смысла (элемент вне схемы)."""
     if not intent.element_detected:
-        emit(f"⚠ элемент не распознан в KPI «{kpi}» — использован дефолт "
-             f"({intent.target_element}). Если нужен другой — упомяните его явно "
-             f"(напр. «медь»/«Cu»).")
+        emit(f"металл в KPI не указан — гипотезы построены по ВСЕМ элементам отчёта "
+             f"({', '.join(schema_symbols)}). Чтобы сузить до одного — упомяните его "
+             f"явно (напр. «медь»/«Cu»).")
         return False
     if not intent.element_in_schema:
-        emit(f"⚠ KPI просит «{intent.requested_element}», но в отчёте по хвостам этого "
+        emit(f"KPI просит «{intent.requested_element}», но в отчёте по хвостам этого "
              f"элемента НЕТ (схема: {', '.join(schema_symbols)}). Детерминированную "
              f"диагностику хвостов по «{intent.requested_element}» построить не из чего "
              f"— она НЕ подменяется никелем. Используйте отчёт с этим элементом или "

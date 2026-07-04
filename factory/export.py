@@ -97,6 +97,7 @@ def _record(h) -> dict:
         "violates_constraints": list(g("violates_constraints", []) or []),
         "literature": list(g("literature", []) or []),   # цитаты из выданного корпуса
         "world_practice": g("world_practice", None),
+        "dossier": list(g("dossier", []) or []),          # статьи OpenAlex (досье по гипотезе)
         "expert_feedback": g("expert_feedback", None),   # вердикт из feedback.json (если был)
         "metrics": dict(g("metrics", {}) or {}),
     }
@@ -178,7 +179,7 @@ def _task_description(r: dict, meta: dict) -> str:
     if isinstance(wp, dict) and wp.get("url"):
         lines.append(f"Мировая практика: {wp.get('practice','')} ({wp['url']})")
     if r["violates_constraints"]:
-        lines.append("⚠ Нарушает ограничение запроса: " + "; ".join(r["violates_constraints"]))
+        lines.append("Внимание: Нарушает ограничение запроса: " + "; ".join(r["violates_constraints"]))
     return "\n".join(lines)
 
 
@@ -286,7 +287,7 @@ def write_pdf(data: dict, path: str) -> str:
       f"отчёта (метрика impact); экспериментально не проверено — протокол проверки "
       f"приложен к каждой гипотезе.", "body")
     for w in meta["warnings"]:
-        P(f"⚠ {E(w)}", "small")
+        P(f"Внимание: {E(w)}", "small")
 
     # сводная таблица ранжирования
     P("Ранжирование гипотез", "h2")
@@ -322,7 +323,7 @@ def write_pdf(data: dict, path: str) -> str:
         P(f"<b>ТО:</b> {E(r['statement_then'])}")
         P(f"<b>ПОТОМУ ЧТО:</b> {E(r['statement_because'])}")
         if r["violates_constraints"]:
-            P(f"⚠ нарушает ограничение запроса: {E('; '.join(r['violates_constraints']))} "
+            P(f"Внимание: нарушает ограничение запроса: {E('; '.join(r['violates_constraints']))} "
               f"— приоритет занижен, гипотеза не скрыта", "small")
         P(f"<b>Эксперимент:</b> {E(r['experiment'])}")
         for s in r.get("roadmap", []):
@@ -404,7 +405,7 @@ def write_docx(data: dict, path: str) -> str:
               f"Оценка — из данных отчёта (impact); экспериментально не проверено — "
               f"протокол проверки приложен к каждой гипотезе.", False, None, None)]),
     ]
-    body += [_dp([(f"⚠ {w}", False, 18, MUTED)]) for w in meta["warnings"]]
+    body += [_dp([(f"Внимание: {w}", False, 18, MUTED)]) for w in meta["warnings"]]
     for r in data["hypotheses"]:
         m = r["metrics"]
         body.append(_dp([(f"#{r['rank']} · {r['intervention']} — класс {r['size_class']} "
@@ -414,7 +415,7 @@ def write_docx(data: dict, path: str) -> str:
                          ("ПОТОМУ ЧТО: ", "statement_because")):
             body.append(_dp([(lab, True, None, BLUE), (r[key], False, None, None)], after=40))
         if r["violates_constraints"]:
-            body.append(_dp([("⚠ нарушает ограничение запроса: "
+            body.append(_dp([("Внимание: нарушает ограничение запроса: "
                               + "; ".join(r["violates_constraints"])
                               + " — приоритет занижен, гипотеза не скрыта",
                               False, 18, MUTED)], after=40))
@@ -480,7 +481,7 @@ def export_all(hyps, profile=None, kpi: str = "", formats="all",
         try:
             paths["pdf"] = write_pdf(data, p("pdf"))
         except RuntimeError as e:          # нет кириллического шрифта — не валим остальное
-            log(f"⚠ PDF пропущен: {e}")
+            log(f"Внимание: PDF пропущен: {e}")
     if "docx" in formats:
         paths["docx"] = write_docx(data, p("docx"))
     for k, v in paths.items():

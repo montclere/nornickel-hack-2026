@@ -254,12 +254,14 @@ class WebPractices:
     def find(self, intervention, family="", element="", extra="") -> "WorldPractice | None":
         # v3: версия схемы кэша — поднята после ввода гейта качества цитат, чтобы
         # старые «цитаты-заголовки» не пережили фикс
-        key = self._key("v3det", intervention, family, element, extra)
-        if key in self._cache:
-            c = self._cache[key]
-            return WorldPractice(**c) if c else None
+        key = self._key("v3det2", intervention, family, element, extra)
+        if key in self._cache and self._cache[key]:
+            return WorldPractice(**self._cache[key])
         res = self._find_uncached(intervention, family, element, extra)
-        self._cache[key] = asdict(res) if res else None
+        # кэшируем ТОЛЬКО успех: транзиентный бот-блок DDG не должен «отравить» кэш и
+        # лишить практик все следующие прогоны с тем же запросом
+        if res:
+            self._cache[key] = asdict(res)
         return res
 
     def _terms(self, intervention, family, element) -> set:

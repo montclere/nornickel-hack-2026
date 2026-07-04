@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Как читать · глоссарий{% endblock %}
+{% block content %}
+<div class="crumbs"><a class="back" href="{{ ('/runs/' ~ run_id) if run_id else '/' }}">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>{{ 'к результатам' if run_id else 'на главную' }}</a></div>
+<h1>Как это <span style="background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent">читать</span></h1>
+<p class="sub">рисунки-примеры (иллюстративные числа), формулы метрик и техники — чтобы
+эксперт мог проверить каждый шаг, а не верить на слово</p>
+<div class="glossary">{{ body | safe }}</div>
+{% endblock %}

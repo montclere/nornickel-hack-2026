@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Поиск гипотез</h1>
 <p class="sub">Загрузите материалы и задайте цель — получите проверяемые гипотезы
-с обоснованием и источниками.</p>
+с обоснованием и источниками.<a class="qmark" href="/glossary" target="_blank" rel="noopener" data-tip="Числа из отчётов по хвостам считаются локально и наружу не уходят. В LLM и OCR попадают только тексты и картинки (литература, сканы) и только при включённых опциях.">?</a></p>
 
 <form id="run-form" class="card-form">
   <div class="dropzones">
@@ -13,9 +13,11 @@
              stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/>
           <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
         <div class="dz-title">Данные фабрики</div>
-        <div class="dz-hint">отчёт по хвостам (<code>.xlsx</code>), схемы и регламенты фабрики</div>
+        <div class="dz-hint">отчёт по хвостам (<code>.xlsx</code>), схемы флотации и регламенты
+          этой фабрики (в т.ч. сканы/картинки)</div>
         <input type="file" class="dz-input" multiple>
       </div>
+      <div class="dz-svc" data-svc="data"></div>
       <ul class="dz-list" data-list="data"></ul>
     </div>
     <div class="dzcol">
@@ -24,23 +26,11 @@
              stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/>
           <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
         <div class="dz-title">Литература</div>
-        <div class="dz-hint">справочники, статьи, методички</div>
+        <div class="dz-hint">справочники, статьи, методички, типовые схемы (общее знание)</div>
         <input type="file" class="dz-input" multiple>
       </div>
+      <div class="dz-svc" data-svc="knowledge"></div>
       <ul class="dz-list" data-list="knowledge"></ul>
-    </div>
-    <div class="dzcol dzwide">
-      <div class="dz" data-role="schemes">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
-             stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/>
-          <circle cx="8.5" cy="9.5" r="1.8"/><path d="M21 15l-4.5-4.5L9 18"/></svg>
-        <div class="dz-title">Схемы и сканы</div>
-        <div class="dz-hint">схемы флотации, цепи аппаратов, сканы регламентов (PNG/JPG/PDF)</div>
-        <div class="dz-warn" id="schemes-warn">сканы распознаются автоматически —
-          качество влияет на результат: лучше чёткий крупный скан без бликов</div>
-        <input type="file" class="dz-input" multiple>
-      </div>
-      <ul class="dz-list" data-list="schemes"></ul>
     </div>
   </div>
 
@@ -80,8 +70,10 @@
 <h2 class="mt">Предыдущие запуски</h2>
 <ul class="runs">
   {% for r in runs %}
-  <li><a href="/runs/{{ r.run_id }}">{{ r.run_id }}</a>
-    <span class="muted">{{ r.kpi }}</span></li>
+  <li>
+    <a href="/runs/{{ r.run_id }}">{{ r.kpi or r.run_id }}</a>
+    {% if r.timestamp %}<time class="run-date">{{ r.timestamp }}</time>{% endif %}
+  </li>
   {% endfor %}
 </ul>
 {% endif %}

@@ -13,7 +13,17 @@ from webapp.di import get_report_service
 from webapp.infra import storage
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parents[2] / "templates"))
+# версия статики для cache-bust (обновляется при рестарте сервера → браузер тянет свежие css/js)
+import time as _time
+TEMPLATES.env.globals["static_v"] = int(_time.time())
 router = APIRouter(tags=["pages"])
+
+
+@router.get("/glossary", response_class=HTMLResponse)
+def glossary_page(request: Request, run_id: str | None = None):
+    from factory.glossary import body_html
+    return TEMPLATES.TemplateResponse(request, "glossary.html",
+                                      {"body": body_html(), "run_id": run_id})
 
 
 @router.get("/", response_class=HTMLResponse)

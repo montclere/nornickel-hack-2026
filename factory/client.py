@@ -29,8 +29,10 @@ _UA = ("Mozilla/5.0 (compatible; HypothesisFactory/1.0; +https://example.org/bot
 
 # circuit-breaker: после N подряд ошибок по источнику — короткая пауза, во время которой
 # вызовы к этому источнику падают сразу (не ждём таймаут каждый раз)
-_BREAKER_THRESHOLD = 4
-_BREAKER_COOLDOWN = 30.0
+# порог повыше: батч-обогащение (досье/практики) не должно глохнуть из-за пары
+# транзиентных 429/таймаутов — предохранитель только против ДОЛГО мёртвого источника
+_BREAKER_THRESHOLD = 10
+_BREAKER_COOLDOWN = 20.0
 
 
 class CircuitOpen(RuntimeError):

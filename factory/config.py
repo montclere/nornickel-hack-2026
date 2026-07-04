@@ -80,8 +80,8 @@ JUDGE_CACHE = os.path.join(OUTPUTS_DIR, "judge_cache.json")
 # и кэшируется по отпечатку запроса → воспроизводимо и заземлено (не выдумка LLM).
 WEB_SEARCH_ENABLED = os.environ.get("FACTORY_WEB", "1") not in ("0", "false", "no", "off")
 WEB_SEARCH_BACKEND = os.environ.get("WEB_BACKEND", "ddg")   # ddg (без ключа) | yandex
-WEB_MAX_RESULTS = int(os.environ.get("WEB_MAX_RESULTS", "6"))   # сколько ссылок тянуть на запрос
-WEB_MAX_HYPS = int(os.environ.get("WEB_MAX_HYPS", "5"))        # для скольких топ-гипотез искать
+WEB_MAX_RESULTS = int(os.environ.get("WEB_MAX_RESULTS", "8"))   # сколько ссылок тянуть на запрос
+WEB_MAX_HYPS = int(os.environ.get("WEB_MAX_HYPS", "6"))        # для скольких топ-гипотез искать
 WEB_FETCH_TIMEOUT = int(os.environ.get("WEB_FETCH_TIMEOUT", "12"))
 WEB_PAGE_CHARS = int(os.environ.get("WEB_PAGE_CHARS", "4000"))  # сколько текста страницы в LLM
 # гейт КАЧЕСТВА цитаты (поверх дословного гейта): цитата обязана быть предложением из
@@ -105,9 +105,14 @@ WEB_INDUSTRIAL_DOMAINS = [s.strip() for s in os.environ.get(
 # соседи» (русские конкуренты/отрасль), а не только мировая литература
 WEB_RU_DOMAINS = [s.strip() for s in os.environ.get(
     "WEB_RU_DOMAINS",
-    "nornickel.ru,rudmet.ru,cyberleninka.ru,elibrary.ru,dprom.online,nedradv.ru,"
+    # горные корпорации РФ (практика внедрений, а не только Норникель)
+    "nornickel.ru,polymetal.ru,polyusgold.com,alrosa.ru,metalloinvest.com,"
+    "uralkali.com,phosagro.ru,evraz.com,mechel.ru,rusal.ru,uralelectromed.com,"
+    "ugmk.com,rmk-group.ru,acron.ru,eurochemgroup.com,"
+    # отраслевые издания, вузы и научные библиотеки
+    "rudmet.ru,cyberleninka.ru,elibrary.ru,dprom.online,nedradv.ru,"
     "metalinfo.ru,metaltorg.ru,vestnik.magtu.ru,gornoe-delo.ru,zolotodb.ru,"
-    "eruda.ru,mining-media.ru").split(",") if s.strip()]
+    "eruda.ru,mining-media.ru,gornayakniga.ru,spmi.ru,misis.ru,igduran.ru").split(",") if s.strip()]
 
 # --- OpenAlex (доказательное досье гипотезы) — НАДЁЖНЫЙ научный API, без ключа, без LLM ---
 # Костяк вау-фичи: статьи + цитируемость («важность») + предложение из abstract («причина»).

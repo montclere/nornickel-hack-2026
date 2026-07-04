@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}#{{ h.rank }} {{ h.intervention }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="/runs/{{ run_id }}">← к списку гипотез</a></div>
+<div class="crumbs"><a class="back" href="/runs/{{ run_id }}">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>к списку гипотез</a></div>
 
 <div class="dhead">
   <div class="hrank big">{{ h.rank }}</div>
@@ -26,11 +27,11 @@
 </div>
 
 <div class="metrics-row">
-  <span><b>{{ h.metrics.priority }}</b> приоритет</span>
-  <span><b>{{ h.metrics.addressability }}</b> излечимость</span>
-  <span><b>{{ h.metrics.clarity }}</b> ясность</span>
-  <span><b>{{ h.metrics.feasibility }}</b> реализуемость</span>
-  {% for sym, t in h.metrics.rec_tonnes.items() %}<span><b>{{ t }}</b> т {{ sym }}</span>{% endfor %}
+  <span data-tip="Итоговый приоритет: выше у крупных, решаемых и понятных потерь."><b>{{ h.metrics.priority }}</b> приоритет</span>
+  <span data-tip="Какую часть потерь этого класса в принципе можно вернуть."><b>{{ h.metrics.addressability }}</b> излечимость</span>
+  <span data-tip="Насколько потери объясняются одной минеральной формой."><b>{{ h.metrics.clarity }}</b> ясность</span>
+  <span data-tip="Проще, если не нужно новое оборудование."><b>{{ h.metrics.feasibility }}</b> реализуемость</span>
+  {% for sym, t in h.metrics.rec_tonnes.items() %}<span data-tip="Извлекаемый {{ sym }} в этом классе — по данным отчёта."><b>{{ t }}</b> т {{ sym }}</span>{% endfor %}
 </div>
 
 <div class="block">
@@ -42,11 +43,19 @@
 
 {% if h.roadmap %}
 <div class="block">
-  <h3>Дорожная карта (лаборатория → пилот → внедрение)</h3>
-  <ol class="rm">
-    {% for s in h.roadmap %}<li><b>{{ s.name }}.</b> {{ s.actions }}
-      <span class="crit">критерий перехода: {{ s.success }}</span></li>{% endfor %}
-  </ol>
+  <h3>Дорожная карта <span class="muted small">лаборатория · пилот · внедрение</span></h3>
+  <div class="rmap">
+    {% for s in h.roadmap %}
+    <div class="rstage">
+      <div class="rstage-node">{{ loop.index }}</div>
+      <div class="rstage-body">
+        <div class="rstage-name">{{ s.name }}</div>
+        <div class="rstage-act">{{ s.actions }}</div>
+        {% if s.success %}<div class="rstage-gate"><span class="gate-lbl">критерий перехода</span>{{ s.success }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}
 
@@ -60,15 +69,20 @@
       {% else %}{{ e.cell }}{% endif %}</li>
     {% endfor %}
   </ul>
-  <div class="muted small">Основание метода: {{ h.sources|join('; ') }}</div>
+  <div class="muted small">Справочные принципы обогащения: {{ h.sources|join('; ') }}</div>
 </div>
 
 {% if h.literature %}
 <div class="block">
-  <h3>Из базы знаний</h3>
-  {% for lq in h.literature %}
-  <blockquote class="q">«{{ lq.quote }}»<span class="loc">{{ lq.locator or lq.source }}</span></blockquote>
-  {% endfor %}
+  <h3>Использованная литература <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Дословные цитаты из загруженных материалов, подкрепляющие гипотезу. Ничего не додумано — только то, что есть в тексте.">?</a></h3>
+  <ul class="litlist">
+    {% for lq in h.literature %}
+    <li>
+      <div class="lit-loc">{{ lq.locator or lq.source }}</div>
+      <blockquote class="q">«{{ lq.quote }}»</blockquote>
+    </li>
+    {% endfor %}
+  </ul>
 </div>
 {% endif %}
 
@@ -115,8 +129,6 @@
     {% if saved_fb %}сохранено: {{ saved_fb.verdict.replace('_',' ') }} ({{ saved_fb.imported_at }}){% endif %}
   </div>
 </div>
-
-<div class="muted small">Все числа взяты из ячеек загруженного отчёта; как считается приоритет — в глоссарии.</div>
 
 <script>
 (function () {

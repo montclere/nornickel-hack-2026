@@ -136,30 +136,41 @@ class OpenAlexDossier:
         return hashlib.sha1("|".join(p).encode("utf-8")).hexdigest()[:16]
 
     def enrich(self, hyps, limit=OPENALEX_MAX_HYPS) -> int:
-        """Прикрепить .dossier (list[Evidence-dict]) к топ-`limit` гипотезам. Возвращает
-        число гипотез, для которых нашлись источники."""
+        """Прикрепить .dossier (list[Evidence-dict]) к топ-`limit` гипотезам. Запросы к
+        OpenAlex идут ПАРАЛЛЕЛЬНО (сеть — узкое место): 6 гипотез за секунды, а не за минуту.
+        Возвращает число гипотез, для которых нашлись источники."""
         if not self.ready:
             return 0
+        from concurrent.futures import ThreadPoolExecutor
+        targets = hyps[:limit]
+
+        def work(h):
+            try:
+                return h, self.dossier(h.intervention, h.family, h.target_element)
+            except Exception:  # noqa: BLE001  (сеть/предохранитель — не роняем весь батч)
+                return h, []
+
         found = 0
-        for h in hyps[:limit]:
-            ev = self.dossier(h.intervention, h.family, h.target_element)
-            h.dossier = [asdict(e) for e in ev]
-            if ev:
-                found += 1
-                self.log(f"досье «{h.intervention[:40]}»: {len(ev)} источн. "
-                         f"(топ {ev[0].cited_by} цит.)")
-            else:
-                self.log(f"досье «{h.intervention[:40]}»: релевантных работ не найдено")
+        with ThreadPoolExecutor(max_workers=min(6, len(targets) or 1)) as ex:
+            for h, ev in ex.map(work, targets):
+                h.dossier = [asdict(e) for e in ev]
+                if ev:
+                    found += 1
+                    self.log(f"досье «{h.intervention[:40]}»: {len(ev)} источн. "
+                             f"(топ {ev[0].cited_by} цит.)")
         self._save()
         return found
 
     def dossier(self, intervention, family="", element="") -> list:
         query = _en_query(intervention, family, element)
-        key = self._key("v1", query)
-        if key in self._cache:
+        key = self._key("v2", query)          # v2: не кэшируем пустое (см. ниже) → старые пустые кэши игнорируются
+        if key in self._cache and self._cache[key]:
             return [Evidence(**e) for e in self._cache[key]]
         ev = self._search(query)
-        self._cache[key] = [asdict(e) for e in ev]
+        # кэшируем ТОЛЬКО непустой результат: транзиентная ошибка/пустая выдача не должна
+        # «отравить» кэш и лишить статей все следующие прогоны с тем же запросом
+        if ev:
+            self._cache[key] = [asdict(e) for e in ev]
         return ev
 
     def _search(self, query) -> list:
@@ -168,8 +179,8 @@ class OpenAlexDossier:
                             "abstract_inverted_index,doi,id"}
         url = f"{OPENALEX_BASE}/works?" + urllib.parse.urlencode(params)
         try:
-            data = get_json(url, headers={"Accept": "application/json"}, timeout=15,
-                            source="openalex", max_retries=2)
+            data = get_json(url, headers={"Accept": "application/json"}, timeout=8,
+                            source="openalex", max_retries=1)
         except Exception as e:  # noqa: BLE001
             self.log(f"OpenAlex недоступен: {e}")
             return []

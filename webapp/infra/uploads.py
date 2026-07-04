@@ -19,9 +19,9 @@ def _safe_rel(name: str) -> str:
     return "/".join(parts) or "file"
 
 
-# роль загрузки → подпапка в sources/. Схемы кладём ВНУТРЬ data («данные фабрики»):
-# ingest по имени папки даст им роль state, а OCR-ветка подхватит картинки как сканы
-_ROLE_DIRS = {"data": "data", "knowledge": "knowledge", "schemes": "data/схемы"}
+# роль загрузки → подпапка в sources/. Схемы/сканы кладутся в data или knowledge как
+# обычные файлы (ingest по имени папки даст роль, OCR-ветка подхватит картинки как сканы)
+_ROLE_DIRS = {"data": "data", "knowledge": "knowledge"}
 
 
 async def save_group(run_id: str, files, role: str) -> list:

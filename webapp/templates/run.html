@@ -1,51 +1,104 @@
 {% extends "base.html" %}
 {% block title %}Результаты · {{ run_id }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="/">← новый запуск</a></div>
-<h1>Гипотезы</h1>
-<div class="kpi-bar"><b>KPI</b> {{ result.kpi }}
-  {% if result.target_element %}<span class="chip">элемент: {{ result.target_element }}
-    {% if not result.element_in_schema %}· ВНЕ схемы хвостов{% endif %}</span>{% endif %}</div>
-{% for w in result.warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+{% set cfg = result.get('config') or {} %}
+{% set up = result.get('uploaded') or {} %}
+<div class="crumbs"><a href="/">новый запуск</a>
+  <a href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" style="margin-left:14px">как читать метрики</a></div>
 
-<div class="reports">
-  {% for name in result.reports %}
-    <a class="rep" href="/runs/{{ run_id }}/report/{{ name }}" target="_blank" rel="noopener">{{ name }}</a>
-  {% endfor %}
-  <a class="rep" href="/runs/{{ run_id }}/report/glossary.html" target="_blank" rel="noopener">глоссарий</a>
-  {% if result.fabrics %}
-  <a class="rep" href="/runs/{{ run_id }}/export/summary" download>сводка (CSV)</a>
+<div class="run-hero">
+  <div class="rh-label">цель</div>
+  <div class="rh-kpi">{{ result.kpi }}</div>
+  {% set nh = result.fabrics | sum(attribute='hypotheses', start=[]) | length %}
+  {% set els = result.get('elements_built') or ([result.target_element] if result.target_element else []) %}
+  <div class="rh-badges">
+    {% if els %}<div class="rh-badge el"><b>{{ els|join(', ') }}</b><span>{{ 'целевые элементы' if els|length > 1 else 'целевой элемент' }}{% if not result.element_in_schema %} · вне схемы{% endif %}</span></div>{% endif %}
+    <div class="rh-badge"><b>{{ nh }}</b><span>гипотез</span></div>
+  </div>
+  {% if result.get('constraints') %}
+  <div class="rh-meta">
+    <span class="rh-conslabel">ограничения:</span>
+    {% for c in result.constraints %}<span class="chip warn-chip">{{ c }}</span>{% endfor %}
+  </div>
   {% endif %}
 </div>
+{% for w in result.warnings %}<div class="warn">{{ w }}</div>{% endfor %}
 
+<!-- ═══ ИНФОРМАЦИЯ: конфиг (фиксирован) + материалы (сворачиваемо) ═══ -->
+<section class="info-block">
+  <div class="ib-col ib-fixed">
+    <h3>Конфигурация запуска <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Что было включено в этом запуске: поиск в интернете, чтение литературы и окно анализа.">?</a></h3>
+    <ul class="kv">
+      <li><span>веб-поиск</span><b>{{ 'вкл' if cfg.get('web_search') else 'выкл' }}</b></li>
+      <li><span>LLM (ветка Б)</span><b>{{ 'вкл' if cfg.get('use_llm') else 'выкл' }}{% if cfg.get('use_llm') and not cfg.get('llm_available') %} · недоступен{% endif %}</b></li>
+      <li><span>поиск</span><b>{{ cfg.get('search', '—') }}</b></li>
+      <li><span>окно ветки Б</span><b>{{ cfg.get('max_chunks', '—') }} фрагм.</b></li>
+      <li><span>время</span><b>{{ result.get('timestamp', '—') }}</b></li>
+    </ul>
+  </div>
+  <details class="ib-col ib-materials">
+    <summary>Загруженные материалы ({{ (up.get('data') or [])|length + (up.get('knowledge') or [])|length }})</summary>
+    <div class="mat-sub">
+      <div class="mat-lbl"><span class="dt data"></span>данные фабрики</div>
+      <div class="files">{% for f in up.get('data') or [] %}<a href="/runs/{{ run_id }}/sources/{{ f }}" target="_blank" rel="noopener" class="file data">{{ f.split('/')|last }}</a>{% else %}<span class="muted small">—</span>{% endfor %}</div>
+    </div>
+    <div class="mat-div"></div>
+    <div class="mat-sub">
+      <div class="mat-lbl"><span class="dt know"></span>знания</div>
+      <div class="files">{% for f in up.get('knowledge') or [] %}<a href="/runs/{{ run_id }}/sources/{{ f }}" target="_blank" rel="noopener" class="file know">{{ f.split('/')|last }}</a>{% else %}<span class="muted small">—</span>{% endfor %}</div>
+    </div>
+  </details>
+</section>
+
+<!-- ═══ ГИПОТЕЗЫ ═══ -->
 {% for fabric in result.fabrics %}
   {% set fi = loop.index0 %}
   {% set m = fabric.meta %}
-  <section class="fabric">
-    <h2>{{ m.fabric }} <span class="src">источник: {{ m.source }}</span></h2>
-    <div class="fmeta">
-      {% for sym, t in m.recoverable_tonnes_total.items() %}<span>{{ t }} т {{ sym }} извлек.</span>{% endfor %}
-      <span>топ-3 покрывают ~{{ m.kpi_potential_top3_pct }}% потерь</span>
-      <span>{{ fabric.hypotheses|length }} гипотез</span>
+  <section class="fabric-block">
+    <div class="fb-head">
+      <h2>{{ m.fabric }}</h2>
+      <div class="fmeta">
+        {% for sym, t in m.recoverable_tonnes_total.items() %}<span><b>{{ t }} т</b> {{ sym }} извлек.</span>{% endfor %}
+        <span>топ-3 ≈ <b>{{ m.kpi_potential_top3_pct }}%</b> потерь</span>
+        <span><b>{{ fabric.hypotheses|length }}</b> гипотез</span>
+      </div>
     </div>
-    <div class="exports">скачать:
-      {% for fmt, label in [('pdf','PDF'), ('docx','DOCX'), ('csv','CSV'),
-                            ('json','JSON'), ('tasks','задачи Jira')] %}
-      <a href="/runs/{{ run_id }}/export/{{ fi }}/{{ fmt }}" download>{{ label }}</a>
-      {% endfor %}
-    </div>
-    <div class="grid">
+
+    {% if fabric.panels_html %}
+    <h3 class="rank-title">Диагностика <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Где теряется металл: по классам крупности и минеральным формам. Всё посчитано из ячеек отчёта.">?</a></h3>
+    <div class="panels">{{ fabric.panels_html | safe }}</div>
+    {% endif %}
+
+    <h3 class="rank-title">Ранжирование гипотез <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Гипотезы отсортированы по приоритету: выше — крупные, решаемые и понятные потери.">?</a></h3>
+    <div class="rank-list">
       {% for h in fabric.hypotheses %}
       {% set im = (h.metrics.impact * 100) | round | int %}
-      <a class="hcard" href="/runs/{{ run_id }}/hyp/{{ fi }}/{{ h.rank }}">
-        <div class="top-row">
-          <div class="hrank">{{ h.rank }}</div>
-          <div class="himpact">{{ im }}%<span>потерь {{ m.target_element }}</span></div>
+      <a class="rcard{% if h.violates_constraints %} viol{% endif %}" href="/runs/{{ run_id }}/hyp/{{ fi }}/{{ h.rank }}">
+        <div class="rc-rank">{{ h.rank }}</div>
+        <div class="rc-main">
+          <div class="rc-head">{{ h.intervention }}</div>
+          <div class="rc-tags">
+            <span class="rc-fam">{{ h.family }}</span>
+            {% if h.secondary %}<span class="rc-2nd">второе направление</span>{% endif %}
+            {% if h.violates_constraints %}<span class="rc-viol">нарушает: {{ h.violates_constraints|join(', ') }}</span>{% endif %}
+            {% if h.expert_feedback %}<span class="rc-fb">эксперт: {{ h.expert_feedback.verdict }}</span>{% endif %}
+          </div>
+          <div class="rc-bars">
+            {% set met = [
+              ('impact', im ~ '%', h.metrics.impact, 'Масштаб: какая доля всех извлекаемых потерь металла по фабрике приходится на этот класс крупности.'),
+              ('addressability', h.metrics.addressability, h.metrics.addressability, 'Излечимость: какую часть потерь этого класса в принципе можно вернуть.'),
+              ('clarity', h.metrics.clarity, h.metrics.clarity, 'Ясность: насколько потери объясняются одной минеральной формой.')] %}
+            {% for name, val, frac, tip in met %}
+            <div class="mbar" data-tip="{{ tip }}"><span>{{ name }}</span>
+              <div class="track"><i style="width:{{ (frac*100)|round|int }}%"></i></div><em>{{ val }}</em></div>
+            {% endfor %}
+          </div>
         </div>
-        <div class="hfam">{{ h.family }}{% if h.secondary %} · второе направление{% endif %}</div>
-        <div class="hint">{{ h.intervention }}</div>
-        <div class="hprio">приоритет {{ h.metrics.priority }}
-          {% if h.expert_feedback %}· фидбэк: {{ h.expert_feedback.verdict }}{% endif %}</div>
+        <div class="rc-right">
+          <div class="rc-impact" data-tip="доля извлекаемых потерь {{ h.target_element }} по фабрике, приходящаяся на этот класс">{{ im }}%<span>потерь {{ h.target_element }}</span></div>
+          <div class="rc-prio" data-tip="Итоговый приоритет: выше у крупных, решаемых и понятных потерь.">приоритет {{ h.metrics.priority }}</div>
+          <div class="rc-open">подробнее</div>
+        </div>
       </a>
       {% endfor %}
     </div>
@@ -53,16 +106,37 @@
 {% endfor %}
 
 {% if not result.fabrics %}
-  <p class="muted">Гипотез по хвостам нет (не загружены отчёты <code>.xlsx</code>, или целевого
-  элемента нет в схеме). {% if result.literature_report %}Смотрите отчёт из литературы выше.{% endif %}</p>
+  <p class="muted">Гипотез по хвостам нет (нет отчётов <code>.xlsx</code> или элемента нет в схеме).
+  {% if result.get('literature_report') %}Ниже — отчёт из литературы.{% endif %}</p>
 {% endif %}
 
-{% if metrics and metrics.total and metrics.total.calls %}
-<div class="metrics">
-  <b>Технические детали:</b> {{ metrics.total.calls }} внешних вызовов ·
-  {{ metrics.total.retries }} ретраев · {{ metrics.total.errors }} ошибок ·
-  токены LLM {{ metrics.total.tokens_in }}→{{ metrics.total.tokens_out }} ·
-  {{ metrics.wall_seconds }} c
-</div>
-{% endif %}
+<!-- ═══ ЭКСПОРТ + ТЕХ.ДЕТАЛИ ═══ -->
+<details class="dl-block">
+  <summary>Экспорт и технические детали</summary>
+  <div class="dl-body">
+    {% for fabric in result.fabrics %}
+    {% set fi = loop.index0 %}
+    <div class="dl-row"><span>{{ fabric.meta.fabric }}:</span>
+      {% for fmt, label in [('pdf','PDF'),('docx','DOCX'),('json','JSON')] %}
+      <a href="/runs/{{ run_id }}/export/{{ fi }}/{{ fmt }}" download>{{ label }}</a>{% endfor %}
+    </div>
+    {% endfor %}
+    <div class="dl-row"><span>общее:</span>
+      {% if result.fabrics %}<a href="/runs/{{ run_id }}/export/summary" download>CSV эксперта (сводка)</a>
+      <a href="/runs/{{ run_id }}/export/0/tasks" download>задачи Jira</a>{% endif %}
+      <a href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener">глоссарий</a>
+      {% if result.get('literature_report') %}<a href="/runs/{{ run_id }}/report/{{ result.literature_report }}" target="_blank" rel="noopener">отчёт из литературы</a>{% endif %}
+    </div>
+    {% if result.get('metrics_total') and result.metrics_total.calls %}
+    {% set mt = result.metrics_total %}
+    <div class="dl-tech">
+      <div class="tech-cell"><b>{{ mt.calls }}</b><span>внешних вызовов</span></div>
+      <div class="tech-cell"><b>{{ mt.retries }}</b><span>ретраев</span></div>
+      <div class="tech-cell"><b>{{ mt.errors }}</b><span>ошибок</span></div>
+      <div class="tech-cell"><b>{{ mt.tokens_in }}</b><span>токенов на вход</span></div>
+      <div class="tech-cell"><b>{{ mt.tokens_out }}</b><span>токенов на выход</span></div>
+    </div>
+    {% endif %}
+  </div>
+</details>
 {% endblock %}

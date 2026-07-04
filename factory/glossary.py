@@ -159,7 +159,9 @@ TECHNIQUES = [
 ]
 
 
-def render():
+def body_html() -> str:
+    """Внутренний контент глоссария (рисунки + таблица метрик + техники) БЕЗ HTML-обёртки —
+    для НАТИВНОГО рендера внутри веб-страницы (webapp, классы .fig/.mt/.e и т.д. в app.css)."""
     figs = "".join(
         f'<div class="fig"><h3>{t}</h3><div class="canvas">{svg}</div><p>{d}</p></div>'
         for t, svg, d in FIGURES)
@@ -169,6 +171,20 @@ def render():
         f'<td class="md">{d}</td></tr>' for t, r, f, d, ex in METRICS)
     trows = "".join(f'<div class="e"><div class="term">{t}</div><div class="d">{d}</div></div>'
                     for t, d in TECHNIQUES)
+    return f"""
+  <h2>Рисунки: как их читать</h2>
+  {figs}
+  <h2>Метрики: формула + пример на числах</h2>
+  <div class="note">Честно разделяем: <b>факт из данных</b> (тоннаж, impact, addressability,
+  clarity — считаются прямо из ячеек) и <b>наша эвристика</b> (priority, шкалы feasibility/
+  confidence — это НАШЕ правило приоритизации, показано открыто, без подтасовки).</div>
+  <table class="gtab"><tbody>{mrows}</tbody></table>
+  <h2>Техники и гейты</h2>
+  {trows}"""
+
+
+def render():
+    body = body_html()
     return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Как это читать · глоссарий</title>
 <style>
@@ -192,23 +208,13 @@ td{{padding:11px 14px;border-top:1px solid #eef4f7;vertical-align:top;font-size:
 a{{color:#1f7ae0;text-decoration:none;font-size:13px}}
 .note{{background:#fff7ed;border:1px solid #fde3c0;border-radius:10px;padding:10px 14px;
   font-size:12.5px;color:#7c4a12;margin:6px 0 18px}}
+.gtab{{width:100%;border-collapse:collapse}}
 </style></head><body><div class="wrap">
   <a href="javascript:history.back()">← назад к отчёту</a>
   <h1>Как это <span>читать</span></h1>
   <div class="sub">рисунки-примеры (иллюстративные числа), формулы метрик и техники — чтобы
   эксперт мог проверить каждый шаг, а не верить на слово</div>
-
-  <h2>Рисунки: как их читать</h2>
-  {figs}
-
-  <h2>Метрики: формула + пример на числах</h2>
-  <div class="note">Честно разделяем: <b>факт из данных</b> (тоннаж, impact, addressability,
-  clarity — считаются прямо из ячеек) и <b>наша эвристика</b> (priority, шкалы feasibility/
-  confidence — это НАШЕ правило приоритизации, показано открыто, без подтасовки).</div>
-  <table><tbody>{mrows}</tbody></table>
-
-  <h2>Техники и гейты</h2>
-  {trows}
+  {body}
 </div></body></html>"""
 
 

@@ -151,7 +151,7 @@ def import_csv(csv_path: str, feedback_path: str = FEEDBACK_PATH,
         verdict = canon_verdict(raw_verdict)
         if verdict is None:
             stats["unknown_verdict"] += 1
-            log(f"  ⚠ непонятный вердикт «{raw_verdict}» — пропущен "
+            log(f"  Внимание: непонятный вердикт «{raw_verdict}» — пропущен "
                 f"(допустимо: полезно / неверно / уже пробовали)")
             continue
         e = {"fabric": row[idx["фабрика"]].strip(),
