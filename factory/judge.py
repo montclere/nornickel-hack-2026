@@ -277,6 +277,11 @@ def judge_everything(fabrics_dir=None, cache_path=None, kpi="", judge_cache=JUDG
 
 
 def main():
+    import sys
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:  # noqa: BLE001
+        pass
     ap = argparse.ArgumentParser(
         description="LLM-as-judge: оценка ВСЕХ гипотез системы (хвосты + литература). "
                     "Ветку Б наполняет ТОЛЬКО flex.py — запустите его первым.")
@@ -302,17 +307,14 @@ def main():
                  "\"...\"' либо передайте --kpi здесь.")
 
     log = lambda m: print("  " + m)
-    print("=" * 74)
-    print("LLM-AS-JUDGE · ОЦЕНКА ВСЕХ ГИПОТЕЗ СИСТЕМЫ")
+    print("LLM-as-judge — оценка всех гипотез системы")
     print(f"KPI: «{kpi}»  [источник: {kpi_source}]")
-    print("=" * 74)
 
     judge = HypothesisJudge()
-    if not judge.ready:
-        print("⚠ нет ключа Yandex (.env) — судья недоступен."); return
-
-    print("\nВЕТКА А · хвосты (детерминированные гипотезы)" if not args.no_tailings else "")
-    print("\nВЕТКА Б · литература (из кэша flex)" if not args.no_literature else "")
+    # PREFLIGHT: без реально доступного LLM судья висит на каждом вердикте — быстрый чек.
+    if not judge.ready or not judge.llm.probe():
+        print("LLM (Yandex) недоступен — судья пропущен."); return
+    print("LLM (Yandex): доступен")
 
     res = judge_everything(
         fabrics_dir=args.fabrics, cache_path=args.cache, kpi=kpi,
@@ -322,22 +324,21 @@ def main():
     if res is None:
         print("\nгипотез не найдено — нечего оценивать."); return
 
-    print(f"\nвсего гипотез к оценке: {len(res['records'])}")
-    print("\n" + "─" * 74)
+    print(f"\nвсего гипотез к оценке: {len(res['records'])}\n")
     for r, it in zip(res["records"], res["items"]):
         v = it["verdict"]
         tag = r["branch"] + (f"/{r['fabric']}" if r["fabric"] else "")
         if not v:
-            print(f"  · [{tag}] [нечитаемо] {r['obj'].statement_if}"); continue
+            print(f"  - [{tag}] [нечитаемо] {r['obj'].statement_if}"); continue
         dims = " ".join(f"{k[:4]}={v[k]['score']}" for k in DIMENSIONS)
-        print(f"  ■ [{tag}] судья={v['overall']}  {dims}")
+        print(f"  [{tag}] судья={v['overall']}  {dims}")
         print(f"     {r['obj'].statement_if}")
 
     a = res["aggregate"]
-    print("\n" + "=" * 74)
+    print()
     if a.get("judged"):
-        dims = " · ".join(f"{k}={a[k]}" for k in DIMENSIONS)
-        print(f"СУДЕЙСКИЙ БАЛЛ (ВСЕ ГИПОТЕЗЫ): {a['overall']}/5  "
+        dims = "  ".join(f"{k}={a[k]}" for k in DIMENSIONS)
+        print(f"судейский балл (все гипотезы): {a['overall']}/5  "
               f"(оценено {a['judged']}/{a['n']}, пропущено {a['skipped']})")
         print(f"по осям: {dims}")
         for label, agg in res["by_branch"].items():
@@ -345,8 +346,7 @@ def main():
                 print(f"  {label}: {agg['overall']}/5 (n={agg['judged']})")
     else:
         print("ни одной гипотезы не удалось оценить (LLM вернул нечитаемое).")
-    print(f"рубрика {res['rubric_version']} · оценка вне ранжирования (LLM не в рассуждении)")
-    print("=" * 74)
+    print(f"рубрика {res['rubric_version']} — оценка вне ранжирования (LLM не в рассуждении)")
 
 
 if __name__ == "__main__":

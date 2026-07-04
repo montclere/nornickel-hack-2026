@@ -32,11 +32,14 @@ class Hypothesis:
     statement_if: str
     statement_then: str
     statement_because: str
-    experiment: str              # протокол проверки — детерминированный шаблон
+    exp_test: str                # эксперимент: ЧТО делаем
+    exp_metric: str              # эксперимент: ЧТО замеряем
+    exp_criterion: str           # эксперимент: критерий успеха
     evidence: list                # [{"label","cell","source"}] — заземление до ячейки
     sources: list
     violates_constraints: list = field(default_factory=list)  # ограничения из промпта, которые нарушены
-    world_practice: str | None = None   # TODO(веб-поиск): подтверждение внедрения в мировой практике
+    world_practice: str | None = None   # веб-поиск: подтверждение внедрения (websearch.py)
+    dossier: list = field(default_factory=list)  # OpenAlex: реальные источники (openalex.py)
     metrics: dict = field(default_factory=dict)
     rank: int = 0
 
@@ -70,6 +73,9 @@ class HypothesisGenerator:
         hyps.sort(key=lambda h: -h.metrics["priority"])
         for i, h in enumerate(hyps, 1):
             h.rank = i
+            for e in h.evidence:                 # реальный файл-источник к каждой ячейке
+                e["source"] = profile.source
+                e["path"] = profile.path         # полный путь → кликабельная ссылка в отчёте
         return hyps
 
     def _build(self, cl, diag, m, element, intent: Intent) -> Hypothesis:
@@ -101,11 +107,12 @@ class HypothesisGenerator:
             violates.append("без нового оборудования")
             priority *= 0.1
 
-        experiment = (f"Тест на классе {cl.size_class}: применить «{primary}» "
-                     f"(промышленный масштаб), замерить извлечение {element} "
-                     f"до/после при контролируемых условиях, сравнить с базовым "
-                     f"режимом. Критерий успеха — рост извлечения {element} из "
-                     f"класса {cl.size_class} относительно базовой линии.")
+        exp_test = (f"Применить «{primary}» на классе {cl.size_class} в промышленном "
+                    f"масштабе при контролируемых условиях, сравнить с базовым режимом.")
+        exp_metric = (f"Извлечение {element} из класса {cl.size_class} до/после "
+                      f"(и содержание {element} в хвостах этого класса).")
+        exp_criterion = (f"Рост извлечения {element} из класса {cl.size_class} относительно "
+                         f"базовой линии без ухудшения качества концентрата.")
 
         m_dict = m.as_dict()
         m_dict["priority"] = round(priority, 5)
@@ -121,5 +128,6 @@ class HypothesisGenerator:
             statement_because=(f"в классе {cl.size_class} {rec.get(element, 0)} т "
                                f"извлекаемого {element} сидит преимущественно в форме "
                                f"«{dom}»; {diag.mechanism}"),
-            experiment=experiment, evidence=evidence, sources=diag.sources,
+            exp_test=exp_test, exp_metric=exp_metric, exp_criterion=exp_criterion,
+            evidence=evidence, sources=diag.sources,
             violates_constraints=violates, metrics=m_dict)

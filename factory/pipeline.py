@@ -86,7 +86,7 @@ def main():
     print("=" * 74)
     warn_intent(res["intent"], args.kpi)
     if p.warnings:
-        print("⚠ ВАЛИДАЦИЯ (парс мог сбиться):")
+        print("ВАЛИДАЦИЯ (парс мог сбиться):")
         for w in p.warnings:
             print(f"   · {w}")
         print()
@@ -99,13 +99,15 @@ def main():
           "clarity — ясность механизма\n")
     for h in hyps:
         m = h.metrics
-        warn = f"  ⚠ нарушает: {', '.join(h.violates_constraints)}" if h.violates_constraints else ""
+        warn = f"  [нарушает: {', '.join(h.violates_constraints)}]" if h.violates_constraints else ""
         print(f"#{h.rank}  impact={round(m['impact']*100)}%  приоритет={m['priority']}  "
               f"[{h.family}]  класс {h.size_class}{warn}")
         print(f"     ЕСЛИ  {h.statement_if}")
         print(f"     ТО    {h.statement_then}")
         print(f"     ПЧ    {h.statement_because}")
-        print(f"     ЭКСПЕРИМЕНТ  {h.experiment}")
+        print(f"     ТЕСТ       {h.exp_test}")
+        print(f"     МЕТРИКА    {h.exp_metric}")
+        print(f"     КРИТЕРИЙ   {h.exp_criterion}")
         print(f"     приоритет={m['priority']} реализуемость={m['feasibility']} "
               f"достоверность={m['confidence']} | ячейки: "
               f"{', '.join(e['cell'] for e in h.evidence)}")

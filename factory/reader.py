@@ -93,7 +93,8 @@ class TailingsProfile:
     fabric: str
     elements: dict = field(default_factory=dict)     # {"Ni": {"grade": .., "cell": ..}}
     classes: list = field(default_factory=list)      # list[ClassLoss], в порядке крупности
-    source: str = ""
+    source: str = ""                                  # имя файла (для показа)
+    path: str = ""                                    # полный путь (для кликабельной ссылки)
     schema_name: str = ""
     warnings: list = field(default_factory=list)     # сигналы «парс мог сбиться»
 
@@ -145,7 +146,7 @@ class TailingsReader:
         grid = {(c.row, c.column): c.value for row in ws.iter_rows() for c in row
                 if c.value is not None}
         prof = TailingsProfile(fabric=self.fabric, source=os.path.basename(self.path),
-                               schema_name=sc.name)
+                               path=self.path, schema_name=sc.name)
 
         # --- секция: берём ПОСЛЕДНЮЮ таблицу с якорем схемы (отвальные общие) ---
         hdr_rows = sorted(r for (r, col), v in grid.items()

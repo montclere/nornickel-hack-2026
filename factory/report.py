@@ -3,8 +3,19 @@
 from __future__ import annotations
 
 import html
+import os
 
+from factory.client import TELEMETRY
+from factory.config import OUTPUTS_DIR
 from factory.reader import ELEMENT_SYMBOLS, PRIMARY_ELEMENT
+
+
+def _rel(path):
+    """Путь к исходнику относительно папки отчёта — для кликабельной ссылки (file://)."""
+    try:
+        return os.path.relpath(path, OUTPUTS_DIR)
+    except (ValueError, TypeError):
+        return path or ""
 
 
 def _esc(x):
@@ -81,22 +92,33 @@ def _graph_svg(layered):
 
 
 # ─────────────────────────── карточки ───────────────────────────
-def _card(h):
+def _evidence_html(evidence):
+    """Заземление до ячейки с КЛИКАБЕЛЬНОЙ ссылкой на файл-источник (открыть в новой вкладке)."""
+    rows = []
+    for e in evidence:
+        loc = _esc((e.get("source", "") + " · ") if e.get("source") else "") + _esc(e.get("cell", ""))
+        if e.get("path"):
+            loc = f'<a href="{_esc(_rel(e["path"]))}" target="_blank" rel="noopener">{loc}</a>'
+        rows.append(f'<div class="ev"><span>{_esc(e["label"])}</span><em>{loc}</em></div>')
+    return "".join(rows)
+
+
+def _card(h, runinfo=None):
+    runinfo = runinfo or {}
     m = h.metrics
     impact_pct = round(m["impact"] * 100)
     alts = "".join(f"<li>{_esc(a)}</li>" for a in h.alternatives)
-    ev = "".join(f'<div class="ev"><span>{_esc(e["label"])}</span>'
-                 f'<em>{_esc(e["cell"])}</em></div>' for e in h.evidence)
+    ev = _evidence_html(h.evidence)
     src = "".join(f"<li>{_esc(s)}</li>" for s in h.sources)
     warn = ""
     if h.violates_constraints:
-        warn = (f'<div class="warn">⚠ нарушает ограничение из запроса: '
+        warn = (f'<div class="warn">нарушает ограничение из запроса: '
                f'{_esc(", ".join(h.violates_constraints))} — приоритет намеренно занижен, '
                f'но гипотеза не скрыта</div>')
     # плитки металла — по КЛЮЧАМ rec_tonnes (из схемы), а не по зашитым Ni/Cu
     metal_pills = "".join(f'<div class="pill"><b>{v}</b><span>т {_esc(sym)} извлек.</span></div>'
                           for sym, v in (h.metrics.get("rec_tonnes") or {}).items())
-    wp = _world_practice_html(h.world_practice)
+    wp = _world_practice_html(h.world_practice, runinfo.get("web"))
     return f"""
     <article class="card">
       <div class="chead">
@@ -123,19 +145,48 @@ def _card(h):
         </div>
       </div>
       <div class="alts"><b>Альтернативы:</b><ul>{alts}</ul></div>
-      <div class="exp"><b>Эксперимент:</b><p>{_esc(h.experiment)}</p></div>
-      <div class="evidence"><b>Заземление (ячейки отчёта):</b>{ev}</div>
-      <div class="src"><b>Источники метода:</b><ul>{src}</ul></div>
+      <div class="exp"><b>Эксперимент</b>
+        <div class="exprow"><span>тест</span><p>{_esc(h.exp_test)}</p></div>
+        <div class="exprow"><span>метрика</span><p>{_esc(h.exp_metric)}</p></div>
+        <div class="exprow"><span>критерий</span><p>{_esc(h.exp_criterion)}</p></div>
+      </div>
+      <div class="evidence"><b>Заземление — ячейки отчёта (клик открывает файл):</b>{ev}</div>
+      <div class="src"><b>Основание метода (правило диагностики):</b><ul>{src}</ul></div>
       <div class="wp"><b>Мировая практика:</b>{wp}</div>
+      {_dossier_html(getattr(h, "dossier", None), runinfo.get("dossier"))}
     </article>"""
 
 
-def _world_practice_html(wp):
+def _dossier_html(dossier, searched=None):
+    """Досье OpenAlex: реальные источники с цитируемостью («важность») + фраза из
+    abstract («причина») + ссылка. Детерминированно, без LLM."""
+    if not dossier:
+        msg = ('по этой гипотезе релевантных научных работ не найдено'
+               if searched else
+               'не искалась — запустите с <code>--dossier</code> '
+               '(научные источники OpenAlex: причины + важность по цитируемости)')
+        return f'<div class="dos"><b>Доказательная база:</b><p class="muted">{msg}</p></div>'
+    items = "".join(
+        f'<div class="dosrc"><div class="doshead">'
+        f'<span class="cit">{e.get("cited_by", 0)} цит.</span>'
+        f'<a href="{_esc(e.get("url",""))}" target="_blank" rel="noopener">'
+        f'{_esc((e.get("title") or "источник")[:110])}</a>'
+        f'<span class="yr">{e.get("year") or ""}</span></div>'
+        f'<div class="dosq">«{_esc(e.get("quote",""))}»</div></div>'
+        for e in dossier)
+    return (f'<div class="dos"><b>Доказательная база ({len(dossier)} источн., OpenAlex):</b>'
+            f'{items}</div>')
+
+
+def _world_practice_html(wp, searched=None):
     """world_practice: dict {practice,quote,url,site} от веб-поиска, либо None.
     Показываем резюме + ДОСЛОВНУЮ цитату + кликабельный источник (заземление)."""
     if not wp:
-        return ('<p class="muted">не искалась — запустите с флагом <code>--web</code> '
-                '(поиск подтверждения в мировой практике с цитатой и ссылкой)</p>')
+        msg = ('по этому вмешательству подтверждающего источника в вебе не найдено'
+               if searched else
+               'не искалась — запустите с <code>--web</code> (подтверждение в мировой '
+               'практике с цитатой и ссылкой)')
+        return f'<p class="muted">{msg}</p>'
     if isinstance(wp, str):        # обратная совместимость
         return f'<p class="muted">{_esc(wp)}</p>'
     url, site = _esc(wp.get("url", "")), _esc(wp.get("site", "источник"))
@@ -171,10 +222,10 @@ def _analysis_html(a):
     if not a:
         return ""
     grind = a.get("optimal_grind")
-    grind_html = (f'<div class="grind">🎯 <b>Обрыв раскрытия</b> до класса <b>{_esc(grind)}</b> — '
-                  f'закрытого Pnt больше раскрытого; измельчать мельче этой границы.</div>'
+    grind_html = (f'<div class="anote"><b>Обрыв раскрытия</b> до класса {_esc(grind)}: '
+                  f'закрытого Pnt больше раскрытого — измельчать мельче этой границы.</div>'
                   if grind else "")
-    tos = "".join(f'<div class="warn">⚠ {_esc(t)}</div>' for t in a.get("tradeoffs", []))
+    tos = "".join(f'<div class="anote">{_esc(t)}</div>' for t in a.get("tradeoffs", []))
     forms = "".join(
         f'<tr class="{"rec" if r["recoverable"] else "norec"}"><td>{"✓" if r["recoverable"] else "✗"}</td>'
         f'<td>{_esc(r["form"])}</td><td>{r["tonnes"]} т</td><td>{r["share_pct"]}%</td>'
@@ -184,7 +235,7 @@ def _analysis_html(a):
     return f"""
   <div class="panel">
     <h2>Кривая раскрытия по крупности ({_esc(el)})</h2>
-    <div class="h-sub">как меняется форма {_esc(el)} с размером частиц (данные отчёта, детерминированно)</div>
+    <div class="h-sub">как меняется форма {_esc(el)} с размером частиц</div>
     {_liberation_svg(a.get("liberation", []))}
     <div class="legend">
       <span><i style="background:#1f7ae0"></i>закрытый Pnt (заперт в сростках)</span>
@@ -200,7 +251,104 @@ def _analysis_html(a):
   </div>"""
 
 
-def render(profile, layered, hyps, kpi="", tech=None, analysis=None):
+def render_literature(discoveries, kpi=""):
+    """Отдельный HTML для гипотез ВЕТКИ Б (из литературы): связи/разрывы Свонсона с
+    ДОСЛОВНЫМИ цитатами и локаторами источника (файл:страница) — то самое «эффектное»
+    заземление до места в документе."""
+    cards = []
+    for i, d in enumerate(discoveries, 1):
+        quotes = []
+        for e in getattr(d, "chain", []) or []:
+            q = (e.get("quote") or "").strip()
+            loc = e.get("locator") or e.get("source") or ""
+            if q:
+                quotes.append(f'<div class="litq">«{_esc(q[:280])}»'
+                              f'<span class="litloc">{_esc(loc)}</span></div>')
+        tag = ("действие" if getattr(d, "is_action", False) else "к исследованию")
+        role = "состояние фабрики" if getattr(d, "role", "") == "state" else "справочное"
+        cards.append(f"""
+    <article class="card">
+      <div class="chead"><div class="rank">#{i}</div>
+        <div class="money">novelty {getattr(d,"novelty",0)}<span>редкость в корпусе</span></div>
+        <div class="fam">{_esc(tag)} · {_esc(role)}</div></div>
+      <div class="tri">
+        <div class="row"><span class="lab">если</span><p>{_esc(d.statement_if)}</p></div>
+        <div class="row"><span class="lab">то</span><p>{_esc(d.statement_then)}</p></div>
+        <div class="row"><span class="lab because">потому что</span>
+          <p class="muted">{_esc(d.statement_because)}</p></div>
+      </div>
+      <div class="litqs"><b>Цитаты-источники</b>{''.join(quotes) or '<p class="muted">—</p>'}</div>
+    </article>""")
+    body = "\n".join(cards) or '<p class="muted">гипотез из литературы не найдено</p>'
+    return f"""<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Гипотезы из литературы</title>
+<style>
+body{{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#12303f;
+  background:linear-gradient(180deg,#e7f3fa,#eef6fb);line-height:1.5}}
+.wrap{{max-width:860px;margin:0 auto;padding:34px 20px 60px}}
+h1{{font-size:24px;font-weight:800;margin:0 0 4px}} h1 span{{color:#12b3ab}}
+.srcbar{{font-size:12.5px;color:#5f7d8c;margin:2px 0 16px}}
+.card{{background:#fff;border:1px solid #e6eef3;border-radius:16px;padding:18px 20px;margin:0 0 14px;
+  box-shadow:0 2px 12px rgba(31,122,224,.06);transition:box-shadow .18s,transform .18s}}
+.card:hover{{box-shadow:0 8px 26px rgba(31,122,224,.13);transform:translateY(-2px)}}
+.chead{{display:flex;align-items:center;gap:12px;margin-bottom:10px}}
+.rank{{font-size:15px;font-weight:800;color:#fff;background:linear-gradient(135deg,#1f7ae0,#12b3ab);
+  width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center}}
+.money{{font-size:15px;font-weight:800;color:#1f7ae0;display:flex;flex-direction:column;line-height:1}}
+.money span{{font-size:10px;font-weight:600;color:#9db3bf}}
+.fam{{margin-left:auto;font-size:11px;font-weight:700;color:#0a7f79;background:#e6f7f5;padding:5px 12px;border-radius:20px}}
+.tri .row{{display:flex;gap:12px;align-items:baseline;margin:5px 0}}
+.lab{{flex:0 0 84px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;color:#9db3bf}}
+.tri p{{margin:0;font-size:14.5px;overflow-wrap:anywhere}} .muted{{color:#5f7d8c}}
+.litqs{{margin-top:10px}} .litqs>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.litq{{margin:6px 0 0;padding:7px 11px;border-left:3px solid #12b3ab;background:#f2fbfa;
+  font-size:12.5px;color:#2a4550;overflow-wrap:anywhere}}
+.litloc{{display:block;margin-top:3px;font-size:11px;color:#1f7ae0;font-weight:600}}
+a{{color:#1f7ae0}}
+</style></head><body><div class="wrap">
+  <h1>Гипотезы из <span>литературы</span></h1>
+  <div class="srcbar">ветка Б · извлечено из текста с цитатным гейтом · KPI: {_esc(kpi)}</div>
+  {body}
+  <div style="text-align:center;margin-top:22px"><a href="glossary.html">как читать →</a></div>
+</div></body></html>"""
+
+
+def _run_badges(hyps, tech, runinfo=None) -> str:
+    """Чем ПОЛЬЗОВАЛИСЬ в прогоне (что реально запускалось, по флагам, а не «нашлось»)."""
+    runinfo = runinfo or {}
+    used = ["ядро (детерминированно)"]
+    if runinfo.get("dossier"):
+        used.append("досье OpenAlex")
+    if runinfo.get("web"):
+        used.append("веб-практики")
+    if tech and tech.get("llm", "нет") not in ("нет", None):
+        used.append("LLM-полировка")
+    return "".join(f'<span class="badge">{_esc(b)}</span>' for b in used)
+
+
+def _metrics_footer() -> str:
+    """Все замеренные метрики прогона (вызовы/задержки/токены) — внизу отчёта."""
+    snap = TELEMETRY.snapshot()
+    if not snap["total"]["calls"]:
+        return ""
+    rows = "".join(
+        f'<tr><td>{_esc(src)}</td><td>{s["calls"]}</td><td>{s["retries"]}</td>'
+        f'<td>{s["errors"]}</td><td>{s["avg_latency_ms"]} мс</td>'
+        f'<td>{s["tokens_in"]}→{s["tokens_out"]}</td></tr>'
+        for src, s in snap["by_source"].items())
+    t = snap["total"]
+    return (f'<div class="panel metrics"><h2>Метрики прогона</h2>'
+            f'<div class="h-sub">внешние вызовы за {snap["wall_seconds"]} c · '
+            f'все считаются в единой точке (client.py) → outputs/run_metrics.json</div>'
+            f'<table class="mtab"><thead><tr><th>источник</th><th>вызовы</th><th>ретраи</th>'
+            f'<th>ошибки</th><th>ср. задержка</th><th>токены in→out</th></tr></thead>'
+            f'<tbody>{rows}</tbody></table>'
+            f'<div class="mtot">итого: {t["calls"]} вызовов, {t["retries"]} ретраев, '
+            f'{t["errors"]} ошибок, токенов LLM {t["tokens_in"]}→{t["tokens_out"]}</div></div>')
+
+
+def render(profile, layered, hyps, kpi="", tech=None, analysis=None, runinfo=None):
     # итоги по металлам — по всем символам схемы, а не по зашитым Ni/Cu
     symbols = list(ELEMENT_SYMBOLS)
     for h in hyps:                                   # добираем символы, если схема шире
@@ -212,7 +360,7 @@ def render(profile, layered, hyps, kpi="", tech=None, analysis=None):
     metal_summary = "".join(
         f'<span><b>{v} т</b><br>извлекаемого {_esc(sym)} в хвостах (факт)</span>'
         for sym, v in totals.items())
-    cards = "\n".join(_card(h) for h in hyps)
+    cards = "\n".join(_card(h, runinfo) for h in hyps)
     graph = _graph_svg(layered)
     techln = ""
     if tech:
@@ -241,7 +389,25 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .legend{{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-top:6px;flex-wrap:wrap}}
 .legend i{{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px}}
 .card{{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 22px;margin:0 0 16px;
-  box-shadow:0 2px 12px rgba(31,122,224,.06)}}
+  box-shadow:0 2px 12px rgba(31,122,224,.06);transition:box-shadow .18s ease,transform .18s ease,border-color .18s}}
+.card:hover{{box-shadow:0 8px 26px rgba(31,122,224,.13);transform:translateY(-2px);border-color:#cfe0ea}}
+/* строка источника + бейджи прогона (что применялось) */
+.srcbar{{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:2px 0 14px}}
+.srcfile{{font-size:12.5px;color:#5f7d8c}} .srcfile b{{color:#12303f}}
+.badge{{font-size:10.5px;font-weight:700;color:#0a7f79;background:var(--teal-soft);
+  border:1px solid #cdeeea;padding:3px 9px;border-radius:20px;transition:transform .15s}}
+.badge:hover{{transform:translateY(-1px)}}
+.glink{{margin-left:auto;font-size:12px;color:var(--blue);text-decoration:none}}
+.glink:hover{{text-decoration:underline}}
+/* нейтральная заметка аналитики (без эмодзи/крика) */
+.anote{{background:#f6fafc;border:1px solid var(--line);border-left:3px solid #cbd9e2;
+  border-radius:8px;padding:9px 13px;font-size:12.5px;color:#425c69;margin:8px 0 0}}
+.anote b{{color:#12303f}}
+/* метрики прогона */
+.metrics .mtab{{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}}
+.metrics .mtab th{{text-align:left;color:#9db3bf;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line)}}
+.metrics .mtab td{{padding:5px 8px;border-bottom:1px solid #f0f5f8}}
+.metrics .mtot{{font-size:11.5px;color:#9db3bf;margin-top:8px}}
 .chead{{display:flex;align-items:center;gap:12px;margin-bottom:12px}}
 .rank{{font-size:16px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--blue),var(--teal));
   width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center}}
@@ -264,7 +430,11 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .alts ul{{margin:5px 0 0;padding-left:18px;color:#37505c}} .alts li{{margin:2px 0}}
 .exp{{font-size:13px;margin:10px 0;background:#f6fbfd;border:1px solid var(--line);
   border-radius:10px;padding:10px 12px}}
-.exp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}} .exp p{{margin:4px 0 0}}
+.exp>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.exprow{{display:flex;gap:10px;align-items:baseline;margin:5px 0 0}}
+.exprow span{{flex:0 0 62px;text-align:right;font-size:10px;font-weight:700;letter-spacing:.4px;
+  text-transform:uppercase;color:#9db3bf}}
+.exprow p{{margin:0;font-size:13px}}
 .src{{font-size:12px;margin:10px 0}} .src b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .src ul{{margin:5px 0 0;padding-left:18px;color:#37505c}} .src li{{margin:2px 0}}
 .wp{{font-size:12px;margin:10px 0}} .wp b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
@@ -272,6 +442,13 @@ h1{{margin:0;font-size:27px;font-weight:800;letter-spacing:-.4px}} h1 span{{colo
 .wpq{{margin:6px 0 4px;padding:6px 10px;border-left:3px solid #12b3ab;background:#f2fbfa;
   color:#2a4550;font-size:12.5px;overflow-wrap:anywhere}}
 .wpsrc{{font-size:11px;color:#9db3bf}} .wpsrc a{{color:#1f7ae0;text-decoration:none}}
+.dos{{font-size:12px;margin:10px 0}} .dos>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
+.dos code{{background:#eef4f7;padding:1px 4px;border-radius:3px}}
+.dosrc{{margin:6px 0;padding:7px 10px;background:#f6fafd;border:1px solid var(--line);border-radius:8px}}
+.doshead{{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}}
+.doshead a{{color:#1f7ae0;text-decoration:none;font-weight:600;font-size:12.5px;flex:1;min-width:0;overflow-wrap:anywhere}}
+.cit{{background:#12b3ab;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:9px;white-space:nowrap}}
+.yr{{color:#9db3bf;font-size:11px}} .dosq{{color:#37505c;font-size:12px;margin-top:3px;overflow-wrap:anywhere}}
 .evidence{{font-size:12px;margin-top:8px}} .evidence>b{{font-size:11px;text-transform:uppercase;color:#9db3bf}}
 .ev{{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed var(--line)}}
 .ev em{{color:#9db3bf;font-style:normal}}
@@ -290,18 +467,19 @@ footer{{color:#9db3bf;font-size:12px;text-align:center;margin-top:26px}}
 footer a{{color:var(--blue);text-decoration:none}}
 </style></head><body><div class="wrap">
   <h1>Фабрика <span>гипотез</span> · {_esc(profile.fabric)}</h1>
-  <div class="sub">детерминированный граф из данных · метрики и логика воспроизводимы · LLM только оформляет текст</div>
-  {"".join(f'<div class="warn">⚠ {_esc(w)}</div>' for w in getattr(profile, "warnings", []))}
+  <div class="srcbar">
+    <span class="srcfile">источник: <b>{_esc(profile.source)}</b></span>
+    {_run_badges(hyps, tech, runinfo)}
+    <a class="glink" href="glossary.html">как читать →</a>
+  </div>
+  {"".join(f'<div class="warn">{_esc(w)}</div>' for w in getattr(profile, "warnings", []))}
   <div class="kpi"><b>KPI</b> &nbsp;{_esc(kpi)}</div>
   <div class="summary">
     {metal_summary}
     <span><b>{len(hyps)}</b><br>гипотез по классам крупности</span>
   </div>
-  <div class="tech">оценка безразмерна (без цен): impact — масштаб потери, addressability — излечимость, clarity — ясность механизма · источник: {_esc(profile.source)}</div>
-  {techln}
   <div class="panel">
     <h2>Граф знаний</h2>
-    <div class="h-sub">извлечён из отчёта детерминированно · ширина ребра ∝ потерям · бирюза = извлекаемая форма</div>
     {graph}
     <div class="legend">
       <span><i style="background:#1f7ae0"></i>элемент → класс (потери)</span>
@@ -312,5 +490,6 @@ footer a{{color:var(--blue);text-decoration:none}}
   {_analysis_html(analysis)}
   <h2 style="margin:0 0 10px;font-size:16px">Ранжированные гипотезы (по приоритету: масштаб × излечимость × реализуемость)</h2>
   {cards}
-  <footer>Каждая гипотеза заземлена до ячейки отчёта · <a href="glossary.html">как считаются метрики →</a></footer>
+  {_metrics_footer()}
+  <footer><a href="glossary.html">как читать граф, кривые и метрики →</a></footer>
 </div></body></html>"""

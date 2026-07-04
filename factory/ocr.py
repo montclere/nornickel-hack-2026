@@ -20,8 +20,8 @@ import hashlib
 import json
 import os
 
+from factory.client import post_json
 from factory.config import OCR_BASE_URL, OCR_CACHE, OCR_LANGS, OCR_MODEL, load_env
-from factory.llm import post_json
 
 
 def _extract_text(d) -> str:
@@ -60,15 +60,47 @@ class YandexOCR:
     def ready(self):
         return bool(self.key and self.folder)
 
+    def probe(self, timeout=6) -> bool:
+        """Быстрый чек РЕАЛЬНОЙ доступности OCR (не только наличия ключа): крошечная
+        картинка, короткий таймаут, БЕЗ ретраев. Любая ошибка/зависание → False, чтобы
+        приём материалов не висел минутами на мёртвом OCR-эндпоинте."""
+        if not self.ready:
+            return False
+        try:
+            import io
+            from PIL import Image
+            buf = io.BytesIO(); Image.new("L", (32, 32), 255).save(buf, format="PNG")
+            data = buf.getvalue()
+        except Exception:  # noqa: BLE001
+            data = base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+        try:
+            post_json(f"{OCR_BASE_URL}/ocr/v1/recognizeText",
+                      {"mimeType": "image/png", "languageCodes": self.langs,
+                       "model": self.model, "content": base64.b64encode(data).decode("ascii")},
+                      {"Authorization": f"Api-Key {self.key}", "x-folder-id": self.folder},
+                      timeout, source="ocr", max_retries=0)
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
     def recognize(self, data: bytes, mime="image/png", timeout=60) -> str:
-        """bytes изображения → распознанный текст (с кэшем). '' при пустом результате."""
-        key = hashlib.sha256(data).hexdigest()[:16] + f":{self.model}:{','.join(self.langs)}"
+        """bytes изображения → распознанный текст (с кэшем). '' при пустом результате.
+        Перед распознаванием чистим картинку (imageprep) — сканы схем очень шумные."""
+        from factory.imageprep import preprocess, preprocess_tag
+        # ключ кэша — по ИСХОДНЫМ байтам + политике предобработки (сменили политику →
+        # перераспознаём), но в OCR уходит уже очищенная картинка (всегда PNG)
+        key = (hashlib.sha256(data).hexdigest()[:16]
+               + f":{self.model}:{','.join(self.langs)}:{preprocess_tag()}")
         if key in self.cache:
             return self.cache[key]
+        clean = preprocess(data)
+        if clean is not data:
+            mime = "image/png"                     # imageprep всегда отдаёт PNG
         payload = {"mimeType": mime, "languageCodes": self.langs, "model": self.model,
-                   "content": base64.b64encode(data).decode("ascii")}
+                   "content": base64.b64encode(clean).decode("ascii")}
         headers = {"Authorization": f"Api-Key {self.key}", "x-folder-id": self.folder}
-        d = post_json(f"{OCR_BASE_URL}/ocr/v1/recognizeText", payload, headers, timeout)
+        d = post_json(f"{OCR_BASE_URL}/ocr/v1/recognizeText", payload, headers, timeout, source="ocr")
         text = _extract_text(d)
         self.cache[key] = text
         self._flush()

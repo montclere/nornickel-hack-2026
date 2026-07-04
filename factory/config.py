@@ -74,9 +74,33 @@ WEB_CACHE = os.path.join(OUTPUTS_DIR, "web_cache.json")
 # профильные журналы, вендоры оборудования). Переопределяется через env (запятыми).
 WEB_INDUSTRIAL_DOMAINS = [s.strip() for s in os.environ.get(
     "WEB_DOMAINS",
+    # мировые (журналы/вендоры)
     "nims.go.jp,saimm.co.za,mdpi.com,sciencedirect.com,springer.com,researchgate.net,"
     "onemine.org,metso.com,mogroup.com,ceecthefuture.org,911metallurgist.com,"
-    "tandfonline.com,osti.gov,doi.org").split(",") if s.strip()]
+    "tandfonline.com,osti.gov,doi.org,"
+    # русскоязычные — отраслевые новости/журналы/конкуренты (ближайшие соседи)
+    "nornickel.ru,rudmet.ru,cyberleninka.ru,elibrary.ru,dprom.online,nedradv.ru,"
+    "metalinfo.ru,metaltorg.ru,vestnik.magtu.ru,gornoe-delo.ru,zolotodb.ru,"
+    "eruda.ru,mining-media.ru").split(",") if s.strip()]
+# русскоязычные домены — их отдельно поднимаем, чтобы среди практик были «ближайшие
+# соседи» (русские конкуренты/отрасль), а не только мировая литература
+WEB_RU_DOMAINS = [s.strip() for s in os.environ.get(
+    "WEB_RU_DOMAINS",
+    "nornickel.ru,rudmet.ru,cyberleninka.ru,elibrary.ru,dprom.online,nedradv.ru,"
+    "metalinfo.ru,metaltorg.ru,vestnik.magtu.ru,gornoe-delo.ru,zolotodb.ru,"
+    "eruda.ru,mining-media.ru").split(",") if s.strip()]
+
+# --- OpenAlex (доказательное досье гипотезы) — НАДЁЖНЫЙ научный API, без ключа, без LLM ---
+# Костяк вау-фичи: статьи + цитируемость («важность») + предложение из abstract («причина»).
+# Ретрив детерминирован; заземление — реальная фраза из abstract (цитатный гейт).
+OPENALEX_ENABLED = os.environ.get("FACTORY_OPENALEX", "1") not in ("0", "false", "no", "off")
+OPENALEX_BASE = os.environ.get("OPENALEX_BASE", "https://api.openalex.org")
+# polite pool: OpenAlex просит контактный mailto — быстрее и стабильнее (не PII фабрик)
+OPENALEX_MAILTO = os.environ.get("OPENALEX_MAILTO", "hypothesis-factory@example.org")
+OPENALEX_PER_HYP = int(os.environ.get("OPENALEX_PER_HYP", "3"))     # источников на гипотезу
+OPENALEX_FETCH = int(os.environ.get("OPENALEX_FETCH", "12"))        # сколько тянуть перед отбором
+OPENALEX_MAX_HYPS = int(os.environ.get("OPENALEX_MAX_HYPS", "6"))   # для скольких топ-гипотез
+OPENALEX_CACHE = os.path.join(OUTPUTS_DIR, "openalex_cache.json")
 
 # --- OCR (Yandex Vision) — картинки и сканы PDF → текст ---
 OCR_ENABLED = os.environ.get("FACTORY_OCR", "1") not in ("0", "false", "no", "off")
@@ -87,3 +111,8 @@ OCR_DPI = int(os.environ.get("OCR_DPI", "200"))           # растеризац
 OCR_MIN_CHARS = int(os.environ.get("OCR_MIN_CHARS", "8"))  # короче — считаем «пусто»
 OCR_PDF_MAX_PAGES = int(os.environ.get("OCR_PDF_MAX_PAGES", "20"))  # предохранитель от скан-книг
 OCR_CACHE = os.path.join(OUTPUTS_DIR, "ocr_cache.json")
+# предобработка картинки ПЕРЕД OCR (Pillow) — схемы флотации ужасного качества, чистка
+# поднимает распознаваемость: grayscale + автоконтраст + апскейл мелкого текста.
+OCR_PREPROCESS = os.environ.get("OCR_PREPROCESS", "1") not in ("0", "false", "no", "off")
+OCR_UPSCALE_MIN_PX = int(os.environ.get("OCR_UPSCALE_MIN_PX", "1400"))  # <мин.стороны → апскейл
+OCR_BINARIZE = os.environ.get("OCR_BINARIZE", "0") not in ("0", "false", "no", "off")  # порог (риск)

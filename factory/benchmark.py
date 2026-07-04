@@ -59,27 +59,37 @@ def _run_judge(fabrics_root, cache_path, kpi, kpi_source):
     """Судья по ВСЕМ гипотезам системы (ветка А хвосты + ветка Б из кэша flex).
     Возвращает res (items/aggregate/by_branch) или None."""
     from factory.judge import judge_everything
+    from factory.llm import Yandex
     log = lambda m: print("  " + m)
-    print("\n" + "=" * 78)
-    print("LLM-AS-JUDGE · ОЦЕНКА ВСЕХ ГИПОТЕЗ (ХВОСТЫ + ЛИТЕРАТУРА ИЗ КЭША)")
-    print("=" * 78)
-    print(f"KPI судьи: «{kpi}»  [источник: {kpi_source}]")
+    print("\nLLM-as-judge — оценка всех гипотез (хвосты + литература из кэша):")
+    # PREFLIGHT: судья без реально доступного LLM висит на каждом вердикте — проверяем
+    # быстро (короткий таймаут, без ретраев) и, если недоступен, честно пропускаем.
+    if not Yandex().probe():
+        print("  LLM (Yandex): недоступен — судья пропущен (ветка А выше уже посчитана).")
+        return None
+    print("  LLM (Yandex): доступен")
+    print(f"  KPI судьи: «{kpi}»  [источник: {kpi_source}]")
     res = judge_everything(fabrics_dir=fabrics_root, cache_path=cache_path, kpi=kpi, log=log)
     if res is None:
-        print("\n(судья пропущен: нет ключа Yandex в .env либо гипотез не нашлось)")
+        print("  судья пропущен: гипотез не нашлось.")
         return None
-    print(f"гипотез к оценке: {len(res['records'])}")
+    print(f"  гипотез к оценке: {len(res['records'])}")
     a = res["aggregate"]
     if a.get("judged"):
-        print(f"\nСУДЕЙСКИЙ БАЛЛ (все гипотезы): {a['overall']}/5 "
+        print(f"  судейский балл (все гипотезы): {a['overall']}/5 "
               f"(оценено {a['judged']}/{a['n']})")
         for label, agg in res["by_branch"].items():
             if agg.get("judged"):
-                print(f"  {label}: {agg['overall']}/5 (n={agg['judged']})")
+                print(f"    {label}: {agg['overall']}/5 (n={agg['judged']})")
     return res
 
 
 def main():
+    import sys
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:  # noqa: BLE001
+        pass
     ap = argparse.ArgumentParser(description="Сводный евал: ветка А (golden) + судья")
     ap.add_argument("root", nargs="?", default="materials/data/fabrics", help="папка с фабриками")
     ap.add_argument("--cache", default=DEFAULT_CACHE,
@@ -101,9 +111,7 @@ def main():
                      "\"...\"', либо передайте --kpi здесь, либо --no-judge без судьи.")
     dirs = sorted(d for d in glob.glob(os.path.join(args.root, "*")) if os.path.isdir(d))
 
-    print("=" * 78)
-    print("ВЕТКА А · GOLDEN-БЕНЧМАРК ПО ФАБРИКАМ (детерминированно, без LLM)")
-    print("=" * 78)
+    print("ветка А — golden-бенчмарк по фабрикам (детерминированно, без LLM):")
     agg_hit = agg_total = 0
     rows = []
     for d in dirs:
@@ -116,41 +124,38 @@ def main():
         cov = r["hit"] / r["total"] if r["total"] else 0
         prec = r["precision_hit"] / r["precision_den"] if r["precision_den"] else 0
         grnd = r["grounded"] / r["n_hyp"] if r["n_hyp"] else 0
-        print(f"\n■ {os.path.basename(d):<10} гипотез: {r['n_hyp']} | "
-              f"recall(покрытие эталона): {r['hit']}/{r['total']} = {cov:.0%} | "
-              f"precision(наши∈эталон): {r['precision_hit']}/{r['precision_den']} = {prec:.0%} | "
-              f"grounding(с ячейками): {grnd:.0%}")
+        print(f"\n  {os.path.basename(d):<10} гипотез: {r['n_hyp']} | "
+              f"recall: {r['hit']}/{r['total']} = {cov:.0%} | "
+              f"precision: {r['precision_hit']}/{r['precision_den']} = {prec:.0%} | "
+              f"grounding: {grnd:.0%}")
         print(f"    наши семейства: {sorted(r['our'])}")
         for g, f in r["golden"]:
-            mark = "✓" if f in r["our"] else "·"
+            mark = "+" if f in r["our"] else "-"
             print(f"    {mark} [{f or 'н/распознано':<20}] {g[:44]}")
 
-    print("\n" + "-" * 78)
+    print()
     total_cov = agg_hit / agg_total if agg_total else 0
-    print(f"ВЕТКА А: {agg_hit}/{agg_total} эталонных гипотез = {total_cov:.0%} family-coverage "
+    print(f"ветка А: {agg_hit}/{agg_total} эталонных гипотез = {total_cov:.0%} family-coverage "
           "(recall из данных, не подсказано)")
-    print("⚠ Честная оговорка: официальный тест-эталон — ОДНА пара (QA), остальные "
-          "фабрики держим как разведочные (unlabeled). Family-coverage меряет пересечение "
-          "СЛОВАРЯ семейств и завышается, если каталог вмешательств широк; поэтому рядом "
-          "показаны precision (не набросали ли лишнего) и grounding (привязка к ячейкам).")
+    print("оговорка: официальный тест-эталон — одна пара (QA), остальные фабрики держим как "
+          "разведочные. Family-coverage меряет пересечение словаря семейств и завышается, "
+          "если каталог широк; поэтому рядом precision (не лишнее ли) и grounding (ячейки).")
 
     judge_res = None
     if not args.no_judge:
         judge_res = _run_judge(args.root, args.cache, judge_kpi, kpi_source)
 
-    print("\n" + "=" * 78)
-    print("СВОДНАЯ ОЦЕНКА")
-    print(f"  Ветка А (хвосты → golden):     {total_cov:.0%} family-coverage ({agg_hit}/{agg_total})")
+    print("\nсводная оценка:")
+    print(f"  ветка А (хвосты → golden): {total_cov:.0%} family-coverage ({agg_hit}/{agg_total})")
     ja = judge_res["aggregate"] if judge_res else None
     if ja and ja.get("judged"):
-        print(f"  Судья (все гипотезы, вне ранжирования): {ja['overall']}/5 "
+        print(f"  судья (все гипотезы, вне ранжирования): {ja['overall']}/5 "
               f"(оценено {ja['judged']}/{ja['n']})")
         for label, agg in judge_res["by_branch"].items():
             if agg.get("judged"):
-                print(f"    · {label}: {agg['overall']}/5")
+                print(f"    {label}: {agg['overall']}/5")
     else:
-        print("  Судья: не оценивал (нет ключа/гипотез или --no-judge)")
-    print("=" * 78)
+        print("  судья: не оценивал (LLM недоступен / нет гипотез / --no-judge)")
 
 
 if __name__ == "__main__":

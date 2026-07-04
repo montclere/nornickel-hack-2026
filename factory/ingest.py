@@ -62,21 +62,23 @@ class Chunk:
 
 
 def _default_ocr():
-    """OCR-клиент Yandex, если включён и готов; иначе None (картинки → needs_ocr)."""
+    """OCR-клиент Yandex, только если он РЕАЛЬНО доступен (probe), а не просто есть ключ —
+    иначе приём висел бы минутами на мёртвом OCR-эндпоинте. Недоступен → None."""
     if not OCR_ENABLED:
         return None
     try:
         from factory.ocr import YandexOCR
         o = YandexOCR()
-        return o if o.ready else None
+        return o if (o.ready and o.probe()) else None
     except Exception:  # noqa: BLE001
         return None
 
 
-def ingest(paths, ocr="auto") -> list:
+def ingest(paths, ocr="auto", log=lambda *a: None) -> list:
     """paths — файл, папка или список. Возвращает список Chunk по всем поддерж. файлам.
 
-    ocr: "auto" — поднять Yandex OCR, если доступен; None — без OCR; или готовый клиент."""
+    ocr: "auto" — поднять Yandex OCR, ЕСЛИ доступен (с проверкой); None — без OCR; или
+    готовый клиент. log — колбэк прогресса (какой файл принимается сейчас)."""
     if isinstance(paths, str):
         paths = [paths]
     files = []
@@ -90,6 +92,7 @@ def ingest(paths, ocr="auto") -> list:
     out = []
     for f in sorted(set(files)):
         if os.path.isfile(f):
+            log(f"приём: {os.path.basename(f)}")
             out += ingest_file(f, ocr)
     return out
 

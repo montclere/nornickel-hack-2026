@@ -9,52 +9,13 @@ from __future__ import annotations
 
 import json
 import os
-import random
 import re
-import time
-import urllib.error
-import urllib.request
 
-from factory.config import LLM_MAX_RETRIES, YANDEX_BASE_URL, YANDEX_MODEL, load_env
+from factory.client import post_json, record_tokens  # единый транспорт+телеметрия
+from factory.config import YANDEX_BASE_URL, YANDEX_MODEL, load_env
 
-# коды, которые имеет смысл повторить (троттлинг/временные сбои сервера)
-_RETRY_CODES = {429, 500, 502, 503, 504}
-
-
-def _retry_after(err):
-    try:
-        return float(err.headers.get("Retry-After"))
-    except (TypeError, ValueError, AttributeError):
-        return None
-
-
-def post_json(url, payload, headers, timeout=90, max_retries=LLM_MAX_RETRIES):
-    """POST JSON с экспоненциальным backoff на 429/5xx/сетевые сбои (учитывает Retry-After).
-
-    Общий транспорт для всех сервисов Yandex (LLM, эмбеддинги, OCR)."""
-    req = urllib.request.Request(
-        url, data=json.dumps(payload).encode("utf-8"),
-        headers={**headers, "Content-Type": "application/json"}, method="POST")
-    last = None
-    for attempt in range(max_retries + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            if e.code not in _RETRY_CODES or attempt == max_retries:
-                raise
-            ra = _retry_after(e)
-            base = ra if ra is not None else min(2 ** attempt, 30)
-            last = e
-        except urllib.error.URLError as e:          # SSL/обрыв соединения — тоже повторяем
-            if attempt == max_retries:
-                raise
-            base = min(2 ** attempt, 30)
-            last = e
-        # джиттер обязателен: без него параллельные воркеры считают ОДИНАКОВУЮ задержку
-        # по одной формуле и просыпаются в один момент — синхронно бьют в лимит второй раз
-        time.sleep(base + random.uniform(0, base * 0.5 + 0.5))
-    raise last                                      # недостижимо, но явно
+# post_json переехал в client.py (общий транспорт с ретраями/джиттером/телеметрией/
+# предохранителем). Оставляем импорт под тем же именем — ocr.py его использует.
 
 
 class Yandex:
@@ -70,9 +31,26 @@ class Yandex:
     def ready(self):
         return bool(self.key and self.folder)
 
-    def _post(self, path, payload, timeout=90):
+    def probe(self, timeout=6) -> bool:
+        """Быстрый чек РЕАЛЬНОЙ доступности LLM (не только наличия ключа): минимальный
+        запрос, короткий таймаут, БЕЗ ретраев. Ошибка/403/зависание → False, чтобы не
+        уходить в долгий backoff на каждом фрагменте при мёртвом/недоступном эндпоинте."""
+        if not self.ready:
+            return False
+        try:
+            post_json(f"{YANDEX_BASE_URL}/completion",
+                      {"modelUri": f"gpt://{self.folder}/{self.model}",
+                       "completionOptions": {"stream": False, "temperature": 0, "maxTokens": "1"},
+                       "messages": [{"role": "user", "text": "ok"}]},
+                      {"Authorization": f"Api-Key {self.key}"}, timeout,
+                      source="llm", max_retries=0)
+            return True
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _post(self, path, payload, timeout=90, source="llm"):
         return post_json(f"{YANDEX_BASE_URL}/{path}", payload,
-                         {"Authorization": f"Api-Key {self.key}"}, timeout)
+                         {"Authorization": f"Api-Key {self.key}"}, timeout, source=source)
 
     def complete(self, system, user, timeout=90):
         payload = {"modelUri": f"gpt://{self.folder}/{self.model}",
@@ -80,14 +58,15 @@ class Yandex:
                                          "maxTokens": str(self.max_tokens)},
                    "messages": [{"role": "system", "text": system},
                                 {"role": "user", "text": user}]}
-        d = self._post("completion", payload, timeout=timeout)
+        d = self._post("completion", payload, timeout=timeout, source="llm")
+        record_tokens("llm", d)                     # учёт токенов из result.usage
         return d["result"]["alternatives"][0]["message"]["text"]
 
     def embed(self, text, kind="doc", timeout=30):
         model = "text-search-doc" if kind == "doc" else "text-search-query"
         d = self._post("textEmbedding",
                        {"modelUri": f"emb://{self.folder}/{model}/latest", "text": text[:2000]},
-                       timeout=timeout)
+                       timeout=timeout, source="embed")
         return d["embedding"]
 
 
