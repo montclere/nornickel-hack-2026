@@ -2,7 +2,7 @@ services:
   webapp:
     build: .
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8002:8000"
     environment:
       YANDEX_API_KEY: "${YANDEX_API_KEY:-}"
       YANDEX_FOLDER_ID: "${YANDEX_FOLDER_ID:-}"

@@ -3,6 +3,33 @@
     "png", "jpg", "jpeg", "tif", "tiff", "webp", "bmp"]);
   const extOk = n => { const i = n.lastIndexOf("."); return i >= 0 && ALLOWED.has(n.slice(i + 1).toLowerCase()); };
 
+  (function tooltips() {
+    const tip = document.createElement("div");
+    tip.id = "tooltip"; tip.hidden = true;
+    document.body.appendChild(tip);
+    let cur = null;
+    const place = el => {
+      const r = el.getBoundingClientRect();
+      tip.style.left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2)) + "px";
+      tip.style.top = (r.top - 10) + "px";
+    };
+    document.addEventListener("mouseover", e => {
+      const el = e.target.closest && e.target.closest("[data-tip]");
+      if (!el || el === cur) return;
+      cur = el;
+      const clickable = el.matches("a,button,.qmark") || !!el.closest("a,button");
+      tip.innerHTML = `<span class="tt-main"></span>`
+        + (clickable ? `<span class="tt-cta">Нажмите, чтобы узнать подробнее</span>` : "");
+      tip.querySelector(".tt-main").textContent = el.getAttribute("data-tip");
+      tip.hidden = false; place(el);
+    });
+    document.addEventListener("mouseout", e => {
+      const el = e.target.closest && e.target.closest("[data-tip]");
+      if (el && el === cur) { tip.hidden = true; cur = null; }
+    });
+    window.addEventListener("scroll", () => { tip.hidden = true; cur = null; }, true);
+  })();
+
   const hEl = document.getElementById("health");
   if (hEl) {
     fetch("/health").then(r => r.json()).then(h => {

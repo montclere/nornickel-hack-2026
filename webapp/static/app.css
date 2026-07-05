@@ -1,8 +1,8 @@
 :root{
 
-  --bg-grad:linear-gradient(180deg,#dfeaf2,#e6eef5); --surface:#fbfdfe; --surface-2:#f2f8fb;
+  --bg-grad:linear-gradient(180deg,#dcedf6,#e4f0f8); --surface:#ffffff; --surface-2:#eef6fb;
   --ink:#12303f; --muted:#5f7d8c; --faint:#9db3bf;
-  --line:#dde8ef; --line-2:#e8eff5;
+  --line:#e6eef3; --line-2:#eef4f8;
   --hov:color-mix(in srgb,var(--accent) 42%,var(--line));
   --accent:#12b3ab; --accent-2:#1f7ae0; --accent-soft:#e6f7f5; --accent-ink:#0a7f79;
   --warn-bg:#fff6e9; --warn-line:#f4dcae; --warn-ink:#8a5a12;
@@ -755,3 +755,30 @@ code{background:var(--line-2);padding:1px 5px;border-radius:5px;font-size:.88em}
 .mat-body.clamped:not(.open)::after{content:"";position:absolute;left:0;right:0;bottom:0;height:38px;background:linear-gradient(transparent,var(--surface));pointer-events:none}
 .mat-more{margin-top:8px;background:none;border:none;color:var(--accent-2);font-weight:600;cursor:pointer;font-size:12.5px;padding:0}
 .mat-more:hover{text-decoration:underline}
+
+.block{padding:18px 20px;margin:15px 0}
+.rcard{padding:18px 20px 18px 22px}
+.tri .row{margin:9px 0}
+.tri p,.rc-head,.dhead h1,.exprow p{overflow-wrap:anywhere}
+.metrics-row{gap:12px 12px;margin:18px 0}
+.rc-tags{gap:7px;margin:9px 0 12px}
+.dhead{gap:18px;margin:8px 0 18px}
+.pills{gap:12px}
+.wrap{padding:30px 26px 76px}
+
+.dz{min-height:152px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface-2);border:1.5px dashed var(--line)}
+
+:root{
+  --bg:#edf1f4; --bg-grad:linear-gradient(180deg,#e8edf1,#eef3f6);
+  --surface:#ffffff; --surface-2:#f3f8fb;
+  --ink:#12303f; --muted:#5f7d8c; --faint:#9db3bf;
+  --line:#e6eef3; --line-2:#eef4f8;
+  --accent:#12b3ab; --accent-2:#1f7ae0; --accent-soft:#e6f7f5; --accent-ink:#0a7f79;
+  --teal:#12b3ab; --blue:#1f7ae0; --soft:#e6f7f5; --hov:color-mix(in srgb,var(--accent) 42%,var(--line));
+  --warn-bg:#fff6e9; --warn-line:#f4dcae; --warn-ink:#8a5a12;
+  --violet-bg:#f1ecfc; --violet-line:#d9ccf5; --violet-ink:#5b3fa8;
+  --r-sm:9px; --r:13px; --r-lg:18px; --fs:15px;
+  --sh-sm:0 2px 12px rgba(31,122,224,.06); --sh-md:0 8px 26px rgba(31,122,224,.13);
+  --grad:linear-gradient(135deg,var(--accent-2),var(--accent));
+}
+body{background:var(--bg-grad) fixed;color:var(--ink)}
