@@ -6,7 +6,6 @@ services:
     environment:
       YANDEX_API_KEY: "${YANDEX_API_KEY:-}"
       YANDEX_FOLDER_ID: "${YANDEX_FOLDER_ID:-}"
-      WEBAPP_SEARCH: "${WEBAPP_SEARCH:-ddg}"
     volumes:
       - ./outputs:/app/outputs
     restart: unless-stopped

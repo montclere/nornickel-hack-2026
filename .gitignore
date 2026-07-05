@@ -16,3 +16,4 @@ materials/
 outputs/
 .ruff_cache/
 .DS_Store
+PLAN.md
