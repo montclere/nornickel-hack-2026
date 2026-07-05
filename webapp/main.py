@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Точка входа FastAPI. Локальный инстанс (не публичный).
-
-Запуск:  uv run uvicorn webapp.main:app --host 127.0.0.1 --port 8000
-Docker:  см. Dockerfile / docker-compose.yml
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,7 +8,6 @@ from fastapi.staticfiles import StaticFiles
 from webapp.config import settings
 
 _STATIC = Path(__file__).resolve().parent / "static"
-
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Фабрика гипотез — локальный сервис",
@@ -34,6 +27,5 @@ def create_app() -> FastAPI:
     app.include_router(expert.router)
     app.include_router(pages.router)
     return app
-
 
 app = create_app()

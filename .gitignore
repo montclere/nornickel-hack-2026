@@ -1,14 +1,11 @@
-# окружение / python
 .venv/
 __pycache__/
 *.pyc
 *.egg-info/
 .DS_Score
 
-# секреты
 .env
 
-# локальные тестовые материалы и данные кейса (в git не храним)
 materials/
 *.zip
 *.pdf
@@ -16,8 +13,6 @@ materials/
 *.xlsx
 *.png
 
-# сгенерированные отчёты
-# *.html
-
-# сгенерированные отчёты
 outputs/
+.ruff_cache/
+.DS_Store

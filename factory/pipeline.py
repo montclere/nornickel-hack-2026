@@ -1,26 +1,21 @@
-# -*- coding: utf-8 -*-
-"""Оркестратор фабрики гипотез. Собирает модули в единый пайплайн (OOP).
-
-Поток: ЧТЕНИЕ (reader) → ГРАФ (knowledge) → ГЕНЕРАЦИЯ+МЕТРИКИ (generator/metrics,
-детерминированно) → [опц. LLM-полировка текста] → ОТЧЁТ (report).
-"""
 from __future__ import annotations
 
 import time
 
-from factory.analysis import analyze
 from factory.config import OUTPUTS_DIR
-from factory.generator import HypothesisGenerator
-from factory.intent import parse_intent, warn_intent
-from factory.knowledge import ProfileGraph
-from factory.reader import TailingsReader
-from factory.report import render
-from factory.schema import DEFAULT_SCHEMA, ReportSchema
+from factory.render.report import render
+from factory.tracka.analysis import analyze
+from factory.tracka.generator import HypothesisGenerator
+from factory.tracka.intent import parse_intent, warn_intent
+from factory.tracka.knowledge import ProfileGraph
+from factory.tracka.reader import TailingsReader
+from factory.tracka.schema import DEFAULT_SCHEMA, ReportSchema
 
 
 class HypothesisFactory:
     def __init__(self, path: str, kpi: str, polish: bool = False,
-                schema: ReportSchema = DEFAULT_SCHEMA):
+                schema: ReportSchema = DEFAULT_SCHEMA, breadth: float = 0.0,
+                max_hyps: int = 0):
         if not kpi or not kpi.strip():
             raise ValueError("KPI обязателен: без него неясно, что оптимизировать. "
                              "Передайте реальную цель, напр. kpi=\"снизить потери "
@@ -29,30 +24,29 @@ class HypothesisFactory:
         self.kpi = kpi
         self.polish = polish
         self.schema = schema
+        self.breadth = breadth
+        self.max_hyps = max_hyps
 
     def run(self):
         t0 = time.perf_counter()
-        intent = parse_intent(self.kpi)                     # KPI → целевой элемент + ограничения
-        profile = TailingsReader(self.path, schema=self.schema).read()  # детерм. чтение по схеме
-        graph = ProfileGraph(profile)                       # граф профиля потерь (ветка А)
-        analysis = analyze(profile, element=intent.target_element)  # кривая раскрытия / формы
-        hyps = HypothesisGenerator().generate(profile, kpi=self.kpi)  # диагноз + метрики (детерм.)
+        intent = parse_intent(self.kpi)
+        profile = TailingsReader(self.path, schema=self.schema).read()
+        graph = ProfileGraph(profile)
+        analysis = analyze(profile, element=intent.target_element)
+        hyps = HypothesisGenerator().generate(profile, kpi=self.kpi,
+                                              breadth=self.breadth, max_hyps=self.max_hyps)
 
-        # фидбэк эксперта (outputs/feedback.json, наполняется factory.feedback import):
-        # детерминированный ре-ранк — «уже пробовали»/«неверно» опускаются, не скрываясь
-        from factory.feedback import apply_feedback
+        from factory.evals.feedback import apply_feedback
         fb_applied = apply_feedback(hyps, profile.fabric)
 
-        # литературное подкрепление из кэша извлечения (наполняет flex.py): цитаты
-        # выданного корпуса на карточках. Read-only и детерминированно; нет кэша → 0
         from factory.config import DEFAULT_CACHE
-        from factory.extract import load_cached_relations
-        from factory.litsupport import enrich as lit_enrich
+        from factory.enrich.litsupport import enrich as lit_enrich
+        from factory.trackb.extract import load_cached_relations
         lit_n = lit_enrich(hyps, load_cached_relations(DEFAULT_CACHE) or [])
 
         used_llm = "нет"
         if self.polish:
-            from factory.llm import Phraser
+            from factory.ext.llm import Phraser
             ph = Phraser()
             if ph.ready:
                 hyps = ph.polish(hyps)
@@ -64,10 +58,8 @@ class HypothesisFactory:
         return {"profile": profile, "graph": graph, "analysis": analysis, "intent": intent,
                 "hypotheses": hyps, "html": html, "tech": tech}
 
-
 def main():
     import argparse
-    import json
     import os
 
     ap = argparse.ArgumentParser(description="Фабрика гипотез по хвостам обогащения")
@@ -89,7 +81,7 @@ def main():
 
     schema = DEFAULT_SCHEMA
     if args.schema:
-        from factory.schema import load_schema
+        from factory.tracka.schema import load_schema
         schema = load_schema(args.schema)
 
     res = HypothesisFactory(args.report, kpi=args.kpi, polish=args.polish, schema=schema).run()
@@ -103,7 +95,7 @@ def main():
     warn_intent(res["intent"], args.kpi)
     if tech.get("feedback"):
         print(f"⚑ применён фидбэк эксперта к {tech['feedback']} гипотезам — приоритеты "
-              f"скорректированы (база: feedback.json, см. factory.feedback)")
+              f"скорректированы (база: feedback.json, см. factory.evals.feedback)")
     if p.warnings:
         print("ВАЛИДАЦИЯ (парс мог сбиться):")
         for w in p.warnings:
@@ -135,21 +127,20 @@ def main():
 
     if args.out:
         out = args.out
-        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)  # --out в новую папку — не падать
+        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     else:
         os.makedirs(OUTPUTS_DIR, exist_ok=True)
         out = os.path.join(OUTPUTS_DIR, f"{p.fabric}_гипотезы.html")
     open(out, "w", encoding="utf-8").write(res["html"])
-    from factory.glossary import write as write_glossary
-    write_glossary(os.path.dirname(out) or ".")   # glossary.html рядом (ссылка из отчёта)
+    from factory.render.glossary import write as write_glossary
+    write_glossary(os.path.dirname(out) or ".")
     print(f"HTML-отчёт с графом: {out}  (+ glossary.html рядом)")
 
     if args.export:
-        from factory.export import export_all
+        from factory.render.export import export_all
         print("\nЭКСПОРТ (те же гипотезы, что в HTML — единый слой serialize):")
         export_all(hyps, profile=p, kpi=args.kpi, formats=args.export,
                    out_dir=os.path.dirname(out) or OUTPUTS_DIR, log=print)
-
 
 if __name__ == "__main__":
     main()

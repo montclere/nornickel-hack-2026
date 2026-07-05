@@ -1,12 +1,6 @@
-# -*- coding: utf-8 -*-
-"""Адаптер Yandex AI Studio под контракт LLMClient.
-
-Для селф-хоста своей модели — сделать такой же класс с методами ready/probe/complete и
-другим base_url (см. factory.config.YANDEX_BASE_URL / env YANDEX_BASE_URL); DI подставит
-его вместо этого. Данные фабрик сюда не уходят — только тексты фрагментов знаний."""
 from __future__ import annotations
 
-from factory.llm import Yandex
+from factory.ext.llm import Yandex
 
 
 class YandexLLM:
@@ -25,6 +19,4 @@ class YandexLLM:
 
     @property
     def raw(self):
-        """Объект, который принимают factory-функции (extract_relations, Phraser): у него
-        те же .ready/.complete. Возвращаем внутренний Yandex."""
         return self._impl

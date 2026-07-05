@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Генерация DEVELOPER_GUIDE.pdf — минималистичный гайд по системе (reportlab).
-
-Запуск:  uv run python -m factory.docs.build_guide
-Шрифты:  DejaVuSans (кириллица) из /usr/share/fonts/truetype/dejavu/
-"""
 from __future__ import annotations
 
 import os
@@ -15,8 +9,16 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (BaseDocTemplate, Frame, HRFlowable, PageTemplate,
-                                Paragraph, Spacer, Table, TableStyle)
+from reportlab.platypus import (
+    BaseDocTemplate,
+    Frame,
+    HRFlowable,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 FONT_DIR = "/usr/share/fonts/truetype/dejavu"
 INK = colors.HexColor("#12303f")
@@ -26,12 +28,10 @@ MUTED = colors.HexColor("#6b8593")
 LINE = colors.HexColor("#dce6ec")
 BG_CODE = colors.HexColor("#f4f8fb")
 
-
 def _fonts():
     pdfmetrics.registerFont(TTFont("DJ", f"{FONT_DIR}/DejaVuSans.ttf"))
     pdfmetrics.registerFont(TTFont("DJ-B", f"{FONT_DIR}/DejaVuSans-Bold.ttf"))
     pdfmetrics.registerFont(TTFont("DJ-M", f"{FONT_DIR}/DejaVuSansMono.ttf"))
-
 
 def _styles():
     base = dict(fontName="DJ", textColor=INK, leading=13.5, fontSize=9.3, alignment=TA_LEFT)
@@ -52,7 +52,6 @@ def _styles():
                                        "borderPadding": 6, "textColor": INK, "spaceAfter": 6}),
         "small": ParagraphStyle("sm", **{**base, "fontSize": 8, "textColor": MUTED}),
     }
-
 
 def build(path="DEVELOPER_GUIDE.pdf"):
     _fonts()
@@ -81,7 +80,6 @@ def build(path="DEVELOPER_GUIDE.pdf"):
         ]))
         story.append(t); SP(6)
 
-    # ─────────────────────────── ТИТУЛ ───────────────────────────
     P("Фабрика гипотез", "title")
     P("Гайд разработчика · детерминированное ядро анализа хвостов обогащения", "sub")
     P("Система по Excel-отчёту о хвостах строит граф знаний, ставит диагноз (где и в "
@@ -90,7 +88,6 @@ def build(path="DEVELOPER_GUIDE.pdf"):
       "отчёта; LLM применяется только для оформления текста и ни на что не влияет по "
       "существу.</b>")
 
-    # ─────────────────────────── ПРИНЦИП ───────────────────────────
     H2("1. Ключевой принцип")
     LI(["<b>Детерминизм.</b> Тот же файл → тот же граф, те же гипотезы, те же числа. "
         "Ни ML, ни эмбеддингов, ни LLM в логике.",
@@ -101,7 +98,6 @@ def build(path="DEVELOPER_GUIDE.pdf"):
         "<b>LLM снаружи, не внутри.</b> Модель — опциональный слой оформления/советов над "
         "ядром, не в пути рассуждения."])
 
-    # ─────────────────────────── ПОТОК ДАННЫХ ───────────────────────────
     H2("2. Поток данных")
     CODE(
         "Excel хвостов\n"
@@ -141,7 +137,6 @@ def build(path="DEVELOPER_GUIDE.pdf"):
          "ключевым словам, coverage"],
     ], [70, 175, 250])
 
-    # ─────────────────────────── ЛОГИКА ПОШАГОВО ───────────────────────────
     H2("4. Логика по шагам")
 
     H3("4.1 reader.py — чтение (детерминированный парсинг)")
@@ -255,7 +250,6 @@ def build(path="DEVELOPER_GUIDE.pdf"):
       "(диагноз, метрики, заземление) остаётся детерминированным. Так система масштабируется, "
       "не превращаясь в чёрный ящик.", "small")
 
-    # ─────────────────────────── СБОРКА ───────────────────────────
     frame = Frame(20 * mm, 16 * mm, A4[0] - 40 * mm, A4[1] - 32 * mm, id="f")
 
     def footer(cv, doc):
@@ -268,7 +262,6 @@ def build(path="DEVELOPER_GUIDE.pdf"):
     doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=footer)])
     doc.build(story)
     return path
-
 
 if __name__ == "__main__":
     out = build(os.path.join(os.getcwd(), "DEVELOPER_GUIDE.pdf"))

@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Поиск гипотез</h1>
 <p class="sub">Загрузите материалы и задайте цель — получите проверяемые гипотезы
-с обоснованием и источниками.<a class="qmark" href="/glossary" target="_blank" rel="noopener" data-tip="Числа из отчётов по хвостам считаются локально и наружу не уходят. В LLM и OCR попадают только тексты и картинки (литература, сканы) и только при включённых опциях.">?</a></p>
+с обоснованием и источниками.<a class="qmark" href="/glossary" target="_blank" rel="noopener" data-tip="Числа из Excel-отчётов по хвостам считаются локально и в LLM не уходят. В LLM/OCR идут загруженные тексты и картинки — литература, сканы, А ТАКЖЕ схемы/регламенты фабрики, если вы их загрузили для связывания A×B (иначе конкретные узлы фабрики не извлечь). Только при включённых опциях.">?</a></p>
 
 <form id="run-form" class="card-form">
   <div class="dropzones">
@@ -46,18 +46,25 @@
     <small>распознанные ограничения помечаются на карточках гипотез</small>
   </label>
 
+  <label class="fld breadth-fld">
+    <span>Режим генерации
+      <a class="qmark" href="/glossary" target="_blank" rel="noopener" data-tip="Точечно — по одному приоритетному действию на каждую проблему (коротко, ранжировано). Разнообразно — раскрываем несколько разных механизмов на ту же потерю (доизмельчение, мелющие тела, гранулометрия питания, классификаторы). Действует на оба трека.">?</a></span>
+    <input type="range" id="breadth" min="0" max="100" value="30" step="10" class="slider">
+    <div class="slider-scale"><span>точечно</span><b id="breadth-val">сбалансировано</b><span>разнообразно</span></div>
+  </label>
+
   <div class="flags">
-    <label class="sw"><input type="checkbox" id="web_search" checked><i></i>
-      <span>Веб-поиск <em>научные статьи и подтверждение практикой</em></span></label>
-    <label class="sw"><input type="checkbox" id="use_llm" checked><i></i>
-      <span>LLM <em>чтение литературы и сканов</em></span></label>
+    <label class="sw"><span>Веб-поиск <em>научные статьи и подтверждение практикой</em></span>
+      <input type="checkbox" id="web_search" checked><i></i></label>
+    <label class="sw"><span>LLM <em>чтение литературы и сканов</em></span>
+      <input type="checkbox" id="use_llm" checked><i></i></label>
   </div>
 
   <details class="adv">
     <summary>Дополнительно</summary>
     <label class="fld">
       <span>Фрагментов литературы за запуск</span>
-      <input type="number" id="max_chunks" value="14" min="2" max="60" step="1">
+      <input type="number" id="max_chunks" value="18" min="2" max="60" step="1">
       <small>сколько фрагментов текста читает LLM; больше — дольше и дороже</small>
     </label>
   </details>

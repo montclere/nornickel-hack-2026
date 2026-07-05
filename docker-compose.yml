@@ -1,16 +1,12 @@
 services:
   webapp:
     build: .
-    # порт пробрасываем ТОЛЬКО на localhost хоста — сервис не публичный
     ports:
       - "127.0.0.1:8000:8000"
     environment:
-      # секреты Yandex — из окружения/.env хоста, в образ не зашиты
       YANDEX_API_KEY: "${YANDEX_API_KEY:-}"
       YANDEX_FOLDER_ID: "${YANDEX_FOLDER_ID:-}"
-      # поиск: ddg (без ключа) | yandex (когда подключат Yandex Search API)
       WEBAPP_SEARCH: "${WEBAPP_SEARCH:-ddg}"
     volumes:
-      # прогоны и кэши наружу — переживают перезапуск, легко смотреть/чистить
       - ./outputs:/app/outputs
     restart: unless-stopped

@@ -53,18 +53,21 @@
       <li><span>время</span><b>{{ result.get('timestamp', '—') }}</b></li>
     </ul>
   </div>
-  <details class="ib-col ib-materials">
-    <summary>Загруженные материалы ({{ (up.get('data') or [])|length + (up.get('knowledge') or [])|length }})</summary>
-    <div class="mat-sub">
-      <div class="mat-lbl"><span class="dt data"></span>данные фабрики</div>
-      <div class="files">{% for f in up.get('data') or [] %}<a href="/runs/{{ run_id }}/sources/{{ f }}" target="_blank" rel="noopener" class="file data">{{ f.split('/')|last }}</a>{% else %}<span class="muted small">—</span>{% endfor %}</div>
+  <div class="ib-col ib-materials" data-materials>
+    <h3>Загруженные материалы ({{ (up.get('data') or [])|length + (up.get('knowledge') or [])|length }})</h3>
+    <div class="mat-body">
+      <div class="mat-sub">
+        <div class="mat-lbl"><span class="dt data"></span>данные фабрики</div>
+        <div class="files">{% for f in up.get('data') or [] %}<a href="/runs/{{ run_id }}/sources/{{ f }}" target="_blank" rel="noopener" class="file data">{{ f.split('/')|last }}</a>{% else %}<span class="muted small">—</span>{% endfor %}</div>
+      </div>
+      <div class="mat-div"></div>
+      <div class="mat-sub">
+        <div class="mat-lbl"><span class="dt know"></span>знания</div>
+        <div class="files">{% for f in up.get('knowledge') or [] %}<a href="/runs/{{ run_id }}/sources/{{ f }}" target="_blank" rel="noopener" class="file know">{{ f.split('/')|last }}</a>{% else %}<span class="muted small">—</span>{% endfor %}</div>
+      </div>
     </div>
-    <div class="mat-div"></div>
-    <div class="mat-sub">
-      <div class="mat-lbl"><span class="dt know"></span>знания</div>
-      <div class="files">{% for f in up.get('knowledge') or [] %}<a href="/runs/{{ run_id }}/sources/{{ f }}" target="_blank" rel="noopener" class="file know">{{ f.split('/')|last }}</a>{% else %}<span class="muted small">—</span>{% endfor %}</div>
-    </div>
-  </details>
+    <button type="button" class="mat-more" hidden>показать все</button>
+  </div>
 </section>
 
 <!-- ═══ ПЕРЕКЛЮЧАТЕЛЬ ТРЕКОВ ═══ -->
@@ -103,11 +106,12 @@
     <div class="rank-list">
       {% for h in fabric.hypotheses %}
       {% set im = (h.metrics.impact * 100) | round | int %}
-      <a class="rcard{% if h.violates_constraints %} viol{% endif %}" href="/runs/{{ run_id }}/hyp/{{ fi }}/{{ h.rank }}">
+      <a class="rcard{% if h.violates_constraints %} viol{% endif %}{% if h.bridge %} axb{% endif %}" href="/runs/{{ run_id }}/hyp/{{ fi }}/{{ h.rank }}">
         <div class="rc-rank">{{ h.rank }}</div>
         <div class="rc-main">
           <div class="rc-head">{{ h.intervention }}</div>
           <div class="rc-tags">
+            {% if h.bridge %}<span class="rc-axb" title="сшито с узлами схемы фабрики (A×B): диагноз привязан к конкретному оборудованию">A×B · схема фабрики</span>{% endif %}
             <span class="rc-fam">{{ h.family }}</span>
             {% if h.secondary %}<span class="rc-2nd">второе направление</span>{% endif %}
             {% if h.violates_constraints %}<span class="rc-viol">нарушает: {{ h.violates_constraints|join(', ') }}</span>{% endif %}
@@ -218,17 +222,18 @@
     {% for fabric in result.fabrics %}
     {% set fi = loop.index0 %}
     <div class="dl-row"><span>{{ fabric.meta.fabric }}:</span>
+      {% if fabric.report_html %}<a href="/runs/{{ run_id }}/report/{{ fabric.report_html }}?dl=1" download
+         title="скачать самодостаточный HTML — тот же вид, что на странице (открыть → Ctrl+P → PDF)">HTML-отчёт</a>{% endif %}
       {% for fmt, label in [('pdf','PDF'),('docx','DOCX'),('json','JSON')] %}
       <a href="/runs/{{ run_id }}/export/{{ fi }}/{{ fmt }}" download>{{ label }}</a>{% endfor %}
     </div>
     {% endfor %}
-    <div class="dl-row"><span>общее:</span>
-      {% if result.fabrics %}<a href="/runs/{{ run_id }}/export/summary" download>CSV эксперта (сводка)</a>
-      <a href="/runs/{{ run_id }}/export/0/tasks" download>задачи Jira</a>{% endif %}
-      <a href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener">глоссарий</a>
-      {% if result.get('literature_report') %}<a href="/runs/{{ run_id }}/report/{{ result.literature_report }}" target="_blank" rel="noopener"
-         title="гипотезы этого отчёта извлечены языковой моделью из загруженной литературы; каждая связь подтверждена дословной цитатой">отчёт из литературы <em class="llm-mark">LLM</em></a>{% endif %}
+    {% if result.get('literature_report') %}
+    <div class="dl-row"><span>Литература <em class="llm-mark">LLM</em>:</span>
+      <a href="/runs/{{ run_id }}/report/{{ result.literature_report }}?dl=1" download
+         title="скачать HTML-отчёт ветки Б из литературы (открыть → Ctrl+P → PDF)">HTML-отчёт</a>
     </div>
+    {% endif %}
     {% if result.get('metrics_total') and result.metrics_total.calls %}
     {% set mt = result.metrics_total %}
     <div class="dl-tech">

@@ -1,18 +1,9 @@
-# -*- coding: utf-8 -*-
-"""Сквозной путь картинки-схемы: OCR-текст → чанк → фильтры отбора извлечения.
-Без сети: OCR подменён фейком. Ловит регрессии фильтров (MIN_PROSE_CHARS,
-доля букв), из-за которых схемы могли бы молча выпадать из ветки Б.
-
-Запуск:  uv run python -m unittest discover tests -v
-"""
 from __future__ import annotations
 
 import os
 import tempfile
 import unittest
 
-# текст, который «распознал» OCR со схемы флотации: реагенты с дозировками,
-# операции, pH — числовая плотность как у настоящей схемы
 _FAKE_OCR_TEXT = """Сода 250–300 г/т
 Руда 52–56 % класса -0,074 мм
 Бутиловый ксантогенат 40–50 г/т
@@ -26,7 +17,6 @@ _FAKE_OCR_TEXT = """Сода 250–300 г/т
 Известь до pH 10 для депрессии пирита
 Отсадка крупного класса перед измельчением"""
 
-
 class _FakeOCR:
     ready = True
 
@@ -36,11 +26,10 @@ class _FakeOCR:
     def probe(self):
         return True
 
-
 class TestOcrPipeline(unittest.TestCase):
     def test_image_chunk_passes_extraction_filters(self):
-        from factory.extract import MIN_PROSE_CHARS, _select
-        from factory.ingest import ingest, split
+        from factory.trackb.extract import MIN_PROSE_CHARS, _select
+        from factory.trackb.ingest import ingest, split
 
         with tempfile.TemporaryDirectory() as td:
             img = os.path.join(td, "data", "схемы", "Схема флотации.png")
@@ -50,11 +39,10 @@ class TestOcrPipeline(unittest.TestCase):
             chunks = split(ingest([img], ocr=_FakeOCR()))
             self.assertEqual(len(chunks), 1)
             c = chunks[0]
-            # мета: это OCR-чанк (мягкий цитатный гейт) и роль «состояние фабрики»
+
             self.assertTrue(c.meta.get("ocr"))
             self.assertEqual(c.role, "state")
-            # фильтры отбора: длина и доля букв (числовая плотность схемы не должна
-            # выбивать её из извлечения)
+
             self.assertGreaterEqual(len(c.text), MIN_PROSE_CHARS)
             alpha = sum(ch.isalpha() for ch in c.text) / len(c.text)
             self.assertGreaterEqual(alpha, 0.55)
@@ -62,7 +50,7 @@ class TestOcrPipeline(unittest.TestCase):
             self.assertEqual(len(sel), 1, "OCR-чанк схемы обязан проходить отбор")
 
     def test_empty_ocr_marks_needs_ocr(self):
-        from factory.ingest import ingest
+        from factory.trackb.ingest import ingest
 
         class _MuteOCR(_FakeOCR):
             def recognize(self, *a, **k):
@@ -75,7 +63,6 @@ class TestOcrPipeline(unittest.TestCase):
             self.assertEqual(len(chunks), 1)
             self.assertTrue(chunks[0].meta.get("needs_ocr"),
                             "пустое распознавание должно честно помечаться")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,30 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Гибкий приём: загрузи ЧТО УГОДНО (папка/файлы) → система разбирается сама.
-
-Диспетчер по типу данных:
-  • отчёт по хвостам (xlsx со структурой) → ДЕТЕРМИНИРОВАННАЯ диагностика (factory core);
-  • прочий текст (PDF/DOCX/TXT/патенты/статьи) → LLM-извлечение связей (цитатный гейт,
-    кэш) → канонический граф → разрывы Свонсона (детерминированно поверх кэша).
-
-Так закрывается требование ТЗ «гибкость входных данных»: детерминизм — в рассуждении,
-LLM — только в понимании неструктурированного текста, с заземлением до цитаты/страницы.
-
-Единственная команда, которая СОХРАНЯЕТ конфиг запуска (см. runconfig.py) — так
-benchmark.py/judge.py могут переиспользовать этот же KPI без copy-paste, если явно не
-передан свой. Единственная команда, которая реально зовёт LLM на извлечение (остальные
-только читают кэш).
-
-Если в этом же прогоне нашлась ветка А (хвосты) — запрос к литературе ОБОГАЩАЕТСЯ
-терминами уже посчитанного диагноза (семейство вмешательства + минеральная форма),
-чтобы искать решения именно под то, что реально нашли в данных, а не по общим словам
-KPI. Если ветки А нет (только разрозненная литература/схемы без структурных данных) —
-ветка Б работает САМОСТОЯТЕЛЬНО на голом KPI, как раньше — это не регрессия, а честный
-fallback.
-
-Запуск:
-    uv run python -m factory.flex materials --kpi "снизить потери никеля с хвостами"
-    uv run python -m factory.flex materials/knowledge/books --kpi "повысить извлечение Ni"
-"""
 from __future__ import annotations
 
 import argparse
@@ -32,36 +5,31 @@ import os
 import time
 
 from factory.config import DEFAULT_CACHE, MIN_PROSE_CHARS, OUTPUTS_DIR, RUN_CONFIG_PATH
-from factory.ingest import ingest, split
 from factory.runconfig import RunConfig, save_run_config
+from factory.trackb.ingest import ingest, split
 
 
 def _is_tailings(path):
-    """Отчёт по хвостам? Пробуем специализированный ридер — есть ли классы крупности."""
     if not path.lower().endswith(".xlsx"):
         return False
     try:
-        from factory.reader import TailingsReader
+        from factory.tracka.reader import TailingsReader
         return len(TailingsReader(path).read().classes) >= 3
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
-
 def _diagnosis_query_terms(all_hyps, limit=4):
-    """Термины уже посчитанного диагноза ветки А — обогатить запрос к литературе.
-    Пусто, если гипотез нет (вызывающий код тогда просто не трогает исходный KPI)."""
     if not all_hyps:
         return ""
     fams = sorted({h.family for h in all_hyps})[:limit]
     forms = sorted({h.dominant_form for h in all_hyps if h.dominant_form})[:limit]
     return " ".join(fams + forms)
 
-
 def main():
     import sys
-    try:                                     # печатать сразу построчно, а не пачкой в конце
+    try:
         sys.stdout.reconfigure(line_buffering=True)
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
     ap = argparse.ArgumentParser(description="Гибкая фабрика гипотез (загрузи что угодно)")
     ap.add_argument("paths", nargs="+", help="файлы или папки с материалами")
@@ -87,9 +55,7 @@ def main():
                               timestamp=time.strftime("%Y-%m-%d %H:%M:%S")),
                     args.run_config)
 
-    # разбираем KPI сразу — чтобы честно предупредить, если целевой элемент не распознан
-    # или его нет в схеме отчёта (иначе ветка А молча выдаст никель под видом ответа)
-    from factory.intent import parse_intent, warn_intent
+    from factory.tracka.intent import parse_intent, warn_intent
     intent = parse_intent(args.kpi)
     skip_branch_a = warn_intent(intent, args.kpi, emit=lambda m: print("\n" + m))
 
@@ -101,7 +67,6 @@ def main():
           f"(его переиспользуют benchmark/judge без --kpi)")
     print("=" * 74)
 
-    # --- собрать все файлы, отделить отчёты по хвостам от прочего текста ---
     all_files = []
     for p in args.paths:
         if not os.path.exists(p):
@@ -113,7 +78,7 @@ def main():
         else:
             all_files.append(p)
     tailings = [f for f in sorted(set(all_files)) if _is_tailings(f)]
-    # эталонные «Гипотезы*.docx» — это ОТВЕТЫ, не знание: не кормим их в извлечение
+
     others = [f for f in sorted(set(all_files))
               if f not in tailings and os.path.isfile(f)
               and "гипотез" not in os.path.basename(f).lower()]
@@ -127,31 +92,28 @@ def main():
     print(f"\nотчётов по хвостам (ветка А, состояние конкретных фабрик): {len(tailings)}")
     print(f"прочих материалов (ветка Б, знание): {len(others)}")
 
-    # --- необязательный веб-поиск мировых практик (заполняет world_practice) ---
     web = None
     if args.web:
-        from factory.websearch import WebPractices
+        from factory.enrich.websearch import WebPractices
         web = WebPractices(log=lambda m: print("  " + m))
         if not web.ready:
             print("\n--web запрошен, но веб-поиск выключен (FACTORY_WEB=0) — "
                   "world_practice останется пустым.")
             web = None
 
-    # --- необязательное доказательное досье OpenAlex (реальные статьи, БЕЗ LLM) ---
     dos = None
     if args.dossier:
-        from factory.openalex import OpenAlexDossier
+        from factory.enrich.openalex import OpenAlexDossier
         dos = OpenAlexDossier(log=lambda m: print("  " + m))
         if not dos.ready:
             print("\n--dossier запрошен, но OpenAlex выключен (FACTORY_OPENALEX=0).")
             dos = None
 
-    runinfo = {"web": bool(web), "dossier": bool(dos)}   # что реально запускалось (для отчёта)
-    reports = []                                          # пути сгенерированных отчётов
+    runinfo = {"web": bool(web), "dossier": bool(dos)}
+    reports = []
 
-    # --- ветка 1: детерминированная диагностика хвостов ---
     all_hyps = []
-    fabric_results = []   # (profile, res, путь HTML) — для дообогащения после извлечения
+    fabric_results = []
     if tailings and skip_branch_a:
         print(f"\nдиагностика хвостов пропущена: элемента «{intent.requested_element}» "
               f"нет в отчётах — работает только ветка Б (литература).")
@@ -162,7 +124,7 @@ def main():
             res = HypothesisFactory(t, kpi=args.kpi).run()
             p, hyps = res["profile"], res["hypotheses"]
             all_hyps.extend(hyps)
-            # обогащение ДО отрисовки HTML — иначе в отчёт попадёт пустой плейсхолдер
+
             if web:
                 print(f"  веб-поиск мировых практик — {p.fabric}")
                 web.enrich(hyps, extra=_diagnosis_query_terms(hyps))
@@ -170,7 +132,7 @@ def main():
                 print(f"  досье OpenAlex — {p.fabric}")
                 dos.enrich(hyps)
             if web or dos:
-                from factory.report import render
+                from factory.render.report import render
                 res["html"] = render(p, res["graph"].to_layered(), hyps, kpi=args.kpi,
                                      tech=res.get("tech"), analysis=res.get("analysis"),
                                      runinfo=runinfo)
@@ -183,18 +145,13 @@ def main():
             print(f"  {p.fabric}: {len(hyps)} гипотез, топ — "
                   f"{top.statement_if if top else '—'}  [{out}]")
 
-    # --- ветка 2: извлечение из текста → граф → открытие ---
     if others:
-        from factory.discover import discover
-        from factory.extract import extract_relations
-        from factory.kgraph import RelationGraph
-        from factory.llm import Yandex
+        from factory.ext.llm import Yandex
+        from factory.trackb.discover import discover
+        from factory.trackb.extract import extract_relations
+        from factory.trackb.kgraph import RelationGraph
         print("\nизвлечение из текста → граф → разрывы Свонсона (ветка Б):")
 
-        # PREFLIGHT: проверяем доступность LLM и OCR ОТДЕЛЬНО и БЫСТРО (короткий таймаут,
-        # без ретраев) ДО тяжёлого приёма — иначе система висит минутами на мёртвом
-        # OCR/LLM-эндпоинте, ничего не печатая. Недоступен OCR → сканы не распознаём (не
-        # виснем); недоступен LLM → ветку Б пропускаем (хвосты/досье/веб уже готовы выше).
         from factory.config import OCR_ENABLED
         print("проверка доступности сервисов:")
         llm = Yandex(temperature=0.0)
@@ -202,7 +159,7 @@ def main():
         print(f"  LLM (Yandex):        {'доступен' if llm_ok else 'недоступен'}")
         ocr_client = None
         if OCR_ENABLED:
-            from factory.ocr import YandexOCR
+            from factory.ext.ocr import YandexOCR
             _o = YandexOCR()
             if _o.ready and _o.probe():
                 ocr_client = _o; print("  OCR (Yandex Vision): доступен")
@@ -222,7 +179,6 @@ def main():
             print(f"текстовых фрагментов: {len(prose)} "
                   f"(состояние фабрики: {n_state}, справочное: {len(prose) - n_state})")
 
-            # запрос к литературе обогащаем диагнозом ветки А (если он был)
             extra = _diagnosis_query_terms(all_hyps)
             query = f"{args.kpi} {extra}".strip() if extra else args.kpi
             if extra:
@@ -232,12 +188,10 @@ def main():
             os.makedirs(OUTPUTS_DIR, exist_ok=True)
             rels = extract_relations(chunks, llm=llm, max_chunks=args.max_chunks,
                                      query=query, cache_path=cache, log=lambda m: print("  " + m))
-            # свежие связи корпуса → подкрепить карточки ветки А цитатами литературы (с
-            # локатором до страницы) и пересобрать их HTML: при прогоне «с нуля» кэша ещё
-            # не было, когда ветка А рисовала отчёты (см. litsupport.py товарища)
+
             if rels and fabric_results:
-                from factory.litsupport import enrich as lit_enrich
-                from factory.report import render
+                from factory.enrich.litsupport import enrich as lit_enrich
+                from factory.render.report import render
                 for p, res, out in fabric_results:
                     n = lit_enrich(res["hypotheses"], rels)
                     if n:
@@ -254,9 +208,8 @@ def main():
             for i, d in enumerate(found, 1):
                 tag = "состояние фабрики" if d.role == "state" else "справочное"
                 print(f"  {i}. novelty={d.novelty} [{tag}] {d.statement_if}")
-            # HTML-отчёт ветки Б (report_kb) — визуальный артефакт с графом; для кейсов без
-            # структурных данных (металлургия: схема+описание+промпт) это ЕДИНСТВЕННЫЙ результат
-            from factory.report_kb import render_kb
+
+            from factory.render.report_kb import render_kb
             stats = kg.stats()
             tech = {"фрагментов": len(prose), "связей в кэше": len(rels),
                     "узлов графа": stats["nodes"], "рёбер": stats["edges"],
@@ -267,15 +220,13 @@ def main():
             reports.append(out_kb)
             print(f"  HTML-отчёт ветки Б: {out_kb}")
 
-    # --- глоссарий рядом с отчётами (ссылка «как читать» в каждом отчёте ведёт сюда) ---
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
-    from factory.glossary import write as write_glossary
+    from factory.render.glossary import write as write_glossary
     write_glossary(OUTPUTS_DIR)
 
-    # --- контекст прогона: какие материалы/источники использованы и что сгенерировано
-    # (пути сохранены — по ним можно открывать исходники на нужном месте) ---
     import json
-    from factory.client import TELEMETRY
+
+    from factory.ext.client import TELEMETRY
     ctx = {"kpi": args.kpi, "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
            "enrichments": [k for k, v in runinfo.items() if v],
            "tailings_used": [os.path.abspath(t) for t in tailings],
@@ -285,7 +236,6 @@ def main():
     json.dump(ctx, open(os.path.join(OUTPUTS_DIR, "run_context.json"), "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
 
-    # --- метрики прогона (бизнес+dev): вызовы/ретраи/задержки/токены по источникам ---
     snap = TELEMETRY.snapshot()
     if snap["total"]["calls"]:
         mpath = TELEMETRY.dump(os.path.join(OUTPUTS_DIR, "run_metrics.json"))
@@ -295,7 +245,6 @@ def main():
               f"{snap['wall_seconds']} c  [{mpath}]")
 
     print(f"\nготово: {len(reports)} отчётов + глоссарий + контекст в {OUTPUTS_DIR}/")
-
 
 if __name__ == "__main__":
     main()

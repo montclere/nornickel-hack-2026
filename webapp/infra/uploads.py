@@ -1,32 +1,17 @@
-# -*- coding: utf-8 -*-
-"""Приём загрузок (multipart) с разделением на ДАННЫЕ (data/state) и ЗНАНИЯ
-(knowledge/reference). Без лимитов на размер/типы: ingest сам пропускает неизвестные
-форматы. Сохраняем ОТНОСИТЕЛЬНЫЙ путь (для загруженных папок), чтобы не терять структуру."""
 from __future__ import annotations
-
-import os
 
 
 class UploadError(ValueError):
     pass
 
-
 def _safe_rel(name: str) -> str:
-    """Относительный путь файла (браузер шлёт имя папки в filename при drag-drop папки),
-    очищенный от выхода наверх/абсолютных путей."""
     name = (name or "").replace("\\", "/")
     parts = [p for p in name.split("/") if p not in ("", ".", "..")]
     return "/".join(parts) or "file"
 
-
-# роль загрузки → подпапка в sources/. Схемы/сканы кладутся в data или knowledge как
-# обычные файлы (ingest по имени папки даст роль, OCR-ветка подхватит картинки как сканы)
 _ROLE_DIRS = {"data": "data", "knowledge": "knowledge"}
 
-
 async def save_group(run_id: str, files, role: str) -> list:
-    """Сохранить группу файлов под sources/<подпапка роли>/. role ∈ {data, knowledge,
-    schemes}. Возвращает список относительных путей (от sources/)."""
     if role not in _ROLE_DIRS:
         raise UploadError(f"неизвестная роль загрузки: {role}")
     from webapp.infra import storage

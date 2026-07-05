@@ -1,28 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Батч-раннер: НАБОР KPI × все фабрики → экспорт по каждому KPI + сводка. Без LLM.
-
-У проверяющих есть held-out набор тестовых KPI — этот модуль прогоняет весь список
-одной командой вместо ручного запуска по одному. Детерминированная ветка А (~0.03 с
-на пару KPI×фабрика), ключ не нужен. Фидбэк эксперта (feedback.json) применяется
-как в обычном прогоне.
-
-Вход:  текстовый файл с KPI (по одному на строку, пустые и «# комментарии» пропускаются)
-       + отчёты: файлы Хвосты*.xlsx и/или папки (ищутся рекурсивно).
-Выход: outputs/batch/kpiNN_<слаг>/ — экспорт по каждому KPI (см. export.py; --html
-       добавляет HTML-отчёты) + сводка по всем парам: сводка.json / сводка.csv.
-
-Честность как везде: KPI с элементом вне схемы отчёта (напр. платина в Cu-Ni отчёте)
-НЕ подменяется дефолтом — пара помечается «элемент вне схемы» в сводке, ветка А по ней
-не считается (см. intent.warn_intent). Ошибка парса одной пары не роняет весь батч —
-фиксируется строкой сводки со статусом «ошибка».
-
-Ветка Б (литература) сюда намеренно не входит: её извлечение требует LLM-вызова на
-КАЖДЫЙ KPI (кэш привязан к запросу) — гоняйте точечно через factory.flex.
-
-Запуск:
-    uv run python -m factory.batch kpi_list.txt materials/fabrics \
-        [--formats json,csv] [--html] [--schema файл.json] [--out-dir outputs/batch]
-"""
 from __future__ import annotations
 
 import argparse
@@ -39,11 +14,9 @@ _SUMMARY_HEADER = ["kpi", "фабрика", "целевой_элемент", "с
                    "топ_вмешательство", "топ_класс", "impact_топ_%",
                    "потенциал_топ3_%", "фидбэк_применён", "предупреждений"]
 
-
 def _slug(kpi: str, maxlen: int = 36) -> str:
     s = re.sub(r"[^0-9a-zа-яё]+", "-", kpi.casefold()).strip("-")
     return s[:maxlen].rstrip("-") or "kpi"
-
 
 def read_kpi_list(path: str) -> list:
     kpis = []
@@ -53,9 +26,7 @@ def read_kpi_list(path: str) -> list:
             kpis.append(line)
     return kpis
 
-
 def collect_reports(paths) -> list:
-    """Файлы отчётов: явные .xlsx как есть; в папках — Хвосты*.xlsx рекурсивно."""
     out = []
     for p in paths:
         if os.path.isdir(p):
@@ -63,7 +34,6 @@ def collect_reports(paths) -> list:
         elif p.lower().endswith(".xlsx"):
             out.append(p)
     return sorted(set(out))
-
 
 def _row(kpi, fabric, element, status, res=None, fb=0):
     hyps = (res or {}).get("hypotheses") or []
@@ -80,13 +50,11 @@ def _row(kpi, fabric, element, status, res=None, fb=0):
         "предупреждений": len((res or {}).get("profile").warnings) if res else "",
     }
 
-
 def run_batch(kpis, reports, schema, formats=FORMATS_DEFAULT, out_dir="",
               html=False, log=lambda *a: None) -> list:
-    """Прогнать все пары KPI×отчёт. Возвращает строки сводки (и пишет её в out_dir)."""
-    from factory.export import export_all
-    from factory.intent import parse_intent, warn_intent
     from factory.pipeline import HypothesisFactory
+    from factory.render.export import export_all
+    from factory.tracka.intent import parse_intent, warn_intent
 
     os.makedirs(out_dir, exist_ok=True)
     summary = []
@@ -100,7 +68,7 @@ def run_batch(kpis, reports, schema, formats=FORMATS_DEFAULT, out_dir="",
         for n in notes:
             log("  " + n.replace("\n", " "))
         if skip:
-            # элемент вне схемы: ветку А честно НЕ считаем (никакой подмены никелем)
+
             for path in reports:
                 summary.append(_row(kpi, os.path.basename(path),
                                     intent.requested_element or "?",
@@ -110,7 +78,7 @@ def run_batch(kpis, reports, schema, formats=FORMATS_DEFAULT, out_dir="",
         for path in reports:
             try:
                 res = HypothesisFactory(path, kpi=kpi, schema=schema).run()
-            except Exception as e:  # noqa: BLE001 — одна битая пара не роняет батч
+            except Exception as e:
                 summary.append(_row(kpi, os.path.basename(path),
                                     intent.target_element, f"ошибка: {e}"))
                 log(f"  ✗ {os.path.basename(path)}: {e}")
@@ -128,7 +96,6 @@ def run_batch(kpis, reports, schema, formats=FORMATS_DEFAULT, out_dir="",
                 f"{top.intervention if top else '—'}"
                 + (f" · ⚑ фидбэк ×{fb}" if fb else ""))
 
-    # сводка: JSON + CSV (';' utf-8-sig — открывается русским Excel)
     json.dump({"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                "n_kpi": len(kpis), "n_reports": len(reports), "rows": summary},
               open(os.path.join(out_dir, "сводка.json"), "w", encoding="utf-8"),
@@ -141,9 +108,8 @@ def run_batch(kpis, reports, schema, formats=FORMATS_DEFAULT, out_dir="",
             w.writerow([r[k] for k in _SUMMARY_HEADER])
     return summary
 
-
 def main():
-    from factory.schema import DEFAULT_SCHEMA, load_schema
+    from factory.tracka.schema import DEFAULT_SCHEMA, load_schema
 
     ap = argparse.ArgumentParser(
         description="Батч-прогон набора KPI по всем фабрикам + экспорт и сводка "
@@ -152,7 +118,7 @@ def main():
     ap.add_argument("reports", nargs="+", help="Хвосты*.xlsx и/или папки с ними")
     ap.add_argument("--formats", default=FORMATS_DEFAULT,
                     help=f"форматы экспорта на каждый KPI (по умолчанию {FORMATS_DEFAULT}; "
-                    "см. factory.export)")
+                    "см. factory.render.export)")
     ap.add_argument("--html", action="store_true", help="писать и HTML-отчёты")
     ap.add_argument("--schema", default="", help="JSON-схема формата отчёта (опц.)")
     ap.add_argument("--out-dir", default=os.path.join("outputs", "batch"))
@@ -166,8 +132,8 @@ def main():
     reports = collect_reports(args.reports)
     if not reports:
         ap.error("отчёты не найдены: передайте Хвосты*.xlsx или папки, где они лежат")
-    from factory.export import FORMATS
-    if args.formats.strip() not in ("all", ""):        # fail-fast ДО прогона (см. export.py)
+    from factory.render.export import FORMATS
+    if args.formats.strip() not in ("all", ""):
         unknown = [f.strip() for f in args.formats.split(",")
                    if f.strip() and f.strip() not in FORMATS]
         if unknown:
@@ -191,7 +157,6 @@ def main():
           f"вне схемы {skipped} · ошибок {failed}")
     print(f"сводка: {os.path.join(args.out_dir, 'сводка.csv')} (+ сводка.json)")
     print("=" * 74)
-
 
 if __name__ == "__main__":
     main()

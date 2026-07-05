@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Pydantic-контракты запрос/ответ API."""
 from __future__ import annotations
 
 from pydantic import BaseModel
@@ -13,10 +11,9 @@ class RunCreated(BaseModel):
     warnings: list[str] = []
     redirect: str
 
-
 class Health(BaseModel):
     ok: bool
-    llm: bool                 # реально доступен эндпоинт (probe)
+    llm: bool
     ocr: bool
     search_backend: str
     search_available: bool

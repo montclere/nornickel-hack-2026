@@ -1,18 +1,12 @@
-# -*- coding: utf-8 -*-
-"""Тесты ограничений из KPI-промпта (intent.py). Без сети, без ключей, stdlib.
-
-Запуск:  uv run python -m unittest discover tests -v
-"""
 from __future__ import annotations
 
 import unittest
 
-from factory.intent import REAGENT_FAMILY, constraint_violations, parse_intent
+from factory.tracka.intent import REAGENT_FAMILY, constraint_violations, parse_intent
 
 
 def tags(intent):
     return {c["tag"] for c in intent.constraints}
-
 
 class TestParseConstraints(unittest.TestCase):
     def test_all_four_dictionary_constraints(self):
@@ -38,7 +32,6 @@ class TestParseConstraints(unittest.TestCase):
         it = parse_intent("снизить потери, не использовать реагент кмц, без остановки")
         self.assertIn("кмц", [c.get("name") for c in it.constraints])
 
-
 class TestViolations(unittest.TestCase):
     def test_equipment(self):
         it = parse_intent("снизить потери никеля без нового оборудования")
@@ -54,12 +47,12 @@ class TestViolations(unittest.TestCase):
 
     def test_named_reagent_matches_text_only(self):
         it = parse_intent("повысить извлечение без реагента кмц")
-        # реагент назван в тексте вмешательства → нарушение
+
         self.assertEqual(
             constraint_violations(it, "реагенты", False,
                                   text="Дозировка КМЦ как депрессора породы"),
             ["без реагента кмц"])
-        # вмешательство не про этот реагент → нарушения нет (даже в реагентном семействе)
+
         self.assertEqual(
             constraint_violations(it, REAGENT_FAMILY, False,
                                   text="Подбор собирателя (ксантогенат)"), [])
@@ -69,12 +62,10 @@ class TestViolations(unittest.TestCase):
         self.assertEqual(it.constraints[0]["kind"], "quality")
         self.assertEqual(constraint_violations(it, REAGENT_FAMILY, True), [])
 
-
 class TestGeneratorPenalty(unittest.TestCase):
     def test_priority_penalty_and_marking(self):
-        """Сквозной: гипотеза с оборудованием при запрете — помечена и в 10 раз ниже."""
-        from factory.generator import HypothesisGenerator
-        from factory.reader import TailingsProfile, ClassLoss, FormLoss
+        from factory.tracka.generator import HypothesisGenerator
+        from factory.tracka.reader import ClassLoss, FormLoss, TailingsProfile
 
         cl = ClassLoss(size_class="-71+45", tonnes={"Ni": 100.0, "Cu": 40.0},
                        cells={"Ni": "E7", "Cu": "G7"})
@@ -90,7 +81,6 @@ class TestGeneratorPenalty(unittest.TestCase):
         self.assertEqual(h1.violates_constraints, ["без нового оборудования"])
         self.assertAlmostEqual(h1.metrics["priority"],
                                round(h0.metrics["priority"] * 0.1, 5), places=5)
-
 
 if __name__ == "__main__":
     unittest.main()

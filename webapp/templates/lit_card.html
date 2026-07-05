@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}#{{ h.rank }} {{ h.lever }}{% endblock %}
 {% block content %}
-<div class="crumbs"><a href="/runs/{{ run_id }}">← к списку гипотез</a></div>
+<div class="crumbs"><a class="back" href="/runs/{{ run_id }}">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>к списку гипотез</a></div>
 
 <div class="dhead">
   <div class="hrank big">{{ h.rank }}</div>
@@ -33,23 +34,27 @@
   <span data-tip="знак влияния рычага на целевой параметр по источнику"><b>{{ 'повышает' if h.sign > 0 else ('снижает' if h.sign < 0 else 'связан') }}</b> влияние</span>
 </div>
 
-<div class="block">
-  <h3>Источники — дословные цитаты <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Каждая связь принята ТОЛЬКО потому, что эта фраза дословно найдена в файле. Клик открывает исходник (PDF — на нужной странице).">?</a></h3>
-  {% for q in h.quotes %}
-  <blockquote class="q">«{{ q.quote }}»
-    <span class="loc">
-      {% if q.path %}<a href="/runs/{{ run_id }}/sources/{{ q.path }}{% if q.page %}#page={{ q.page }}{% endif %}"
-        target="_blank" rel="noopener">{{ q.locator }}</a>
-      {% else %}{{ q.locator }}{% endif %}
-    </span>
-  </blockquote>
-  {% else %}<p class="muted">структурный вывод графа — прямой цитаты у ребра нет</p>{% endfor %}
+<div class="block srcblock">
+  <span class="corner-llm" title="связи извлекла языковая модель из загруженной литературы; дословность каждой цитаты проверена автоматически">LLM-разбор</span>
+  <h3>Использованная литература <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Каждая связь принята ТОЛЬКО потому, что эта фраза дословно найдена в файле. Клик открывает исходник (PDF — на нужной странице).">?</a></h3>
+  <ul class="litlist">
+    {% for q in h.quotes %}
+    <li>
+      <div class="lit-loc">
+        {% if q.path %}<a href="/runs/{{ run_id }}/sources/{{ q.path }}{% if q.page %}#page={{ q.page }}{% endif %}" target="_blank" rel="noopener">{{ q.locator }}</a>
+        {% else %}{{ q.locator }}{% endif %}
+      </div>
+      <blockquote class="q">«{{ q.quote }}»</blockquote>
+    </li>
+    {% else %}<li><p class="muted">структурный вывод графа — прямой цитаты у ребра нет</p></li>{% endfor %}
+  </ul>
 </div>
 
 {% if h.world_practice and h.world_practice.url %}
 <div class="block">
-  <h3>Мировая практика</h3>
-  <blockquote class="q">«{{ h.world_practice.quote }}»</blockquote>
+  <h3>Похожие практики <span class="muted small">(веб-поиск, дословная цитата — не проверенное внедрение)</span></h3>
+  <blockquote class="q"><a class="q-src" href="{{ h.world_practice.url }}#:~:text={{ h.world_practice.quote[:180] | urlencode }}"
+     target="_blank" rel="noopener" title="открыть источник с подсветкой этой фразы">«{{ h.world_practice.quote }}»</a></blockquote>
   <div class="small">источник:
     <a href="{{ h.world_practice.url }}" target="_blank" rel="noopener">{{ h.world_practice.site }}</a></div>
 </div>
@@ -63,7 +68,8 @@
     <div><span class="cit">{{ d.cited_by }} цит.</span>
       <a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.title }}</a>
       <span class="muted">{{ d.year }}</span></div>
-    {% if d.quote %}<div class="q">«{{ d.quote }}»</div>{% endif %}
+    {% if d.quote %}<blockquote class="q"><a class="q-src" href="{{ d.url }}#:~:text={{ d.quote[:180] | urlencode }}"
+       target="_blank" rel="noopener" title="открыть статью с подсветкой этой фразы">«{{ d.quote }}»</a></blockquote>{% endif %}
   </div>
   {% endfor %}
 </div>

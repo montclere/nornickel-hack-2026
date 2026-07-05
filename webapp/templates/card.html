@@ -7,7 +7,7 @@
 <div class="dhead">
   <div class="hrank big">{{ h.rank }}</div>
   <div>
-    <h1>{{ h.intervention }}</h1>
+    <h1>{{ h.intervention }}{% if h.bridge %}<span class="axb-badge" title="сшито с узлами схемы фабрики (A×B)">A×B</span>{% endif %}</h1>
     <div class="dmeta">{{ meta.fabric }} · класс {{ h.size_class }} · {{ h.family }}
       {% if h.secondary %}· второе направление{% endif %}</div>
   </div>
@@ -60,6 +60,26 @@
 </div>
 {% endif %}
 
+{% if h.bridge %}
+<div class="block srcblock bridge-block">
+  <span class="corner-llm" title="узлы извлечены из загруженной схемы/регламента фабрики; сопоставление с диагнозом — детерминированное по семейству вмешательства">A×B</span>
+  <h3>Привязка к схеме фабрики <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Диагноз (где и в какой форме теряется металл) сшит с конкретными узлами ЭТОЙ фабрики из загруженной схемы. Так абстрактное действие становится адресным.">?</a></h3>
+  <p class="bridge-lead">Действие «{{ h.intervention }}» на этой фабрике касается узлов:</p>
+  <ul class="litlist">
+    {% for b in h.bridge %}
+    <li>
+      <div class="bridge-unit">{{ b.unit }}</div>
+      {% if b.quote %}<blockquote class="q">«{{ b.quote }}»</blockquote>{% endif %}
+      <div class="lit-loc">
+        {% if b.path %}<a href="/runs/{{ run_id }}/sources/{{ b.path }}{% if b.page %}#page={{ b.page }}{% endif %}" target="_blank" rel="noopener">{{ b.locator or b.source }}</a>
+        {% else %}{{ b.locator or b.source }}{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <div class="block">
   <h3>Данные из отчёта</h3>
   <ul class="ev">
@@ -74,12 +94,16 @@
 </div>
 
 {% if h.literature %}
-<div class="block">
-  <h3>Использованная литература <em class="llm-mark" title="выдержки нашла языковая модель при разборе загруженных материалов; дословность каждой цитаты проверена автоматически">LLM-разбор</em> <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Дословные цитаты из загруженных материалов, подкрепляющие гипотезу. Ничего не додумано — только то, что есть в тексте.">?</a></h3>
+<div class="block srcblock">
+  <span class="corner-llm" title="выдержки нашла языковая модель при разборе загруженных материалов; дословность каждой цитаты проверена автоматически">LLM-разбор</span>
+  <h3>Использованная литература <a class="qmark" href="/glossary?run_id={{ run_id }}" target="_blank" rel="noopener" data-tip="Дословные цитаты из загруженных материалов, подкрепляющие гипотезу. Ничего не додумано — только то, что есть в тексте.">?</a></h3>
   <ul class="litlist">
     {% for lq in h.literature %}
     <li>
-      <div class="lit-loc">{{ lq.locator or lq.source }}</div>
+      <div class="lit-loc">
+        {% if lq.path %}<a href="/runs/{{ run_id }}/sources/{{ lq.path }}{% if lq.page %}#page={{ lq.page }}{% endif %}" target="_blank" rel="noopener">{{ lq.locator or lq.source }}</a>
+        {% else %}{{ lq.locator or lq.source }}{% endif %}
+      </div>
       <blockquote class="q">«{{ lq.quote }}»</blockquote>
     </li>
     {% endfor %}
@@ -89,8 +113,9 @@
 
 {% if h.world_practice and h.world_practice.url %}
 <div class="block">
-  <h3>Мировая практика</h3>
-  <blockquote class="q">«{{ h.world_practice.quote }}»</blockquote>
+  <h3>Похожие практики <span class="muted small">(веб-поиск, дословная цитата — не проверенное внедрение)</span></h3>
+  <blockquote class="q"><a class="q-src" href="{{ h.world_practice.url }}#:~:text={{ h.world_practice.quote[:180] | urlencode }}"
+     target="_blank" rel="noopener" title="открыть источник с подсветкой этой фразы">«{{ h.world_practice.quote }}»</a></blockquote>
   <div class="small">источник:
     <a href="{{ h.world_practice.url }}" target="_blank" rel="noopener">{{ h.world_practice.site }}</a></div>
 </div>
@@ -104,7 +129,8 @@
     <div><span class="cit">{{ d.cited_by }} цит.</span>
       <a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.title }}</a>
       <span class="muted">{{ d.year }}</span></div>
-    <div class="q">«{{ d.quote }}»</div>
+    <blockquote class="q"><a class="q-src" href="{{ d.url }}#:~:text={{ d.quote[:180] | urlencode }}"
+       target="_blank" rel="noopener" title="открыть статью с подсветкой этой фразы">«{{ d.quote }}»</a></blockquote>
   </div>
   {% endfor %}
 </div>

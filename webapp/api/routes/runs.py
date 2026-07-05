@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""Создание прогона: загрузка материалов (data/knowledge) + KPI + параметры → запуск ядра
-в ФОНЕ (поток), с записью прогресса по этапам в status.json. Клиент уходит на экран
-загрузки и опрашивает статус."""
 from __future__ import annotations
 
 import threading
@@ -15,9 +11,7 @@ from webapp.interfaces import LLMClient, SearchClient
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
-
-def _job(run_id, kpi, constraints, web_search, use_llm, max_chunks, llm, search):
-    """Фоновая задача: гонит RunService, пишет прогресс/итог/ошибку в status.json."""
+def _job(run_id, kpi, constraints, web_search, use_llm, max_chunks, breadth, llm, search):
     from webapp.services.run_service import RunService
 
     def progress(text):
@@ -28,8 +22,6 @@ def _job(run_id, kpi, constraints, web_search, use_llm, max_chunks, llm, search)
         storage.save_json(run_id, "status.json", st)
 
     def detail(text):
-        """Мелкие строки хода работы (какая фабрика, что ищем) — в лог экрана
-        загрузки, НЕ меняя текущий этап."""
         st = storage.load_json(run_id, "status.json") or {"log": []}
         st.setdefault("log", []).append(str(text))
         storage.save_json(run_id, "status.json", st)
@@ -37,15 +29,14 @@ def _job(run_id, kpi, constraints, web_search, use_llm, max_chunks, llm, search)
     try:
         RunService(llm=llm, search=search).run(
             run_id, kpi, constraints=constraints, web_search=web_search, use_llm=use_llm,
-            max_chunks=max_chunks, progress=progress, log=detail)
+            max_chunks=max_chunks, breadth=breadth, progress=progress, log=detail)
         st = storage.load_json(run_id, "status.json") or {}
         st.update({"current": "Готово", "done": True, "redirect": f"/runs/{run_id}"})
         storage.save_json(run_id, "status.json", st)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         st = storage.load_json(run_id, "status.json") or {}
         st.update({"error": str(e), "done": True})
         storage.save_json(run_id, "status.json", st)
-
 
 @router.post("/runs")
 async def create_run(
@@ -54,6 +45,7 @@ async def create_run(
     web_search: bool = Form(False),
     use_llm: bool = Form(True),
     max_chunks: int = Form(settings.DEFAULT_MAX_CHUNKS),
+    breadth: float = Form(0.0),
     data_files: list[UploadFile] = File(default=[]),
     knowledge_files: list[UploadFile] = File(default=[]),
     llm: LLMClient = Depends(get_llm),
@@ -74,18 +66,16 @@ async def create_run(
     storage.save_json(run_id, "status.json",
                       {"current": "постановка в очередь", "log": [], "done": False, "error": None})
     max_chunks = max(2, min(60, int(max_chunks)))
+    breadth = max(0.0, min(1.0, float(breadth)))
     constraints = (constraints or "").strip()[:settings.MAX_KPI_LEN]
     threading.Thread(target=_job, daemon=True,
-                     args=(run_id, kpi, constraints, web_search, use_llm, max_chunks, llm, search)).start()
+                     args=(run_id, kpi, constraints, web_search, use_llm, max_chunks,
+                           breadth, llm, search)).start()
     return {"run_id": run_id, "redirect": f"/runs/{run_id}/loading"}
-
 
 @router.post("/runs/{run_id}/feedback")
 def save_feedback(run_id: str, fi: int = Form(...), rank: int = Form(...),
                   verdict: str = Form(...), note: str = Form("")):
-    """Вердикт эксперта с карточки → общая база feedback.json (factory.feedback).
-    Тот же механизм, что у импорта из CSV: следующий запуск (веб или CLI)
-    применит вердикт автоматически — переранжирует, не скрывая гипотезу."""
     result = storage.load_json(run_id, "result.json")
     if not result:
         raise HTTPException(404, "результаты не найдены")
@@ -96,7 +86,7 @@ def save_feedback(run_id: str, fi: int = Form(...), rank: int = Form(...),
     if hyp is None:
         raise HTTPException(404, "гипотеза не найдена")
 
-    from factory.feedback import upsert
+    from factory.evals.feedback import upsert
     entry = {"fabric": fabrics[fi].get("meta", {}).get("fabric", ""),
              "size_class": hyp.get("size_class", ""), "family": hyp.get("family", ""),
              "intervention": hyp.get("intervention", ""),
@@ -107,7 +97,6 @@ def save_feedback(run_id: str, fi: int = Form(...), rank: int = Form(...),
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     return {"ok": True, "verdict": saved["verdict"], "note": saved.get("note", "")}
-
 
 @router.get("/runs/{run_id}/status")
 def run_status(run_id: str):
